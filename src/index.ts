@@ -1,6 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { getLargestStockDips } from './fetchTopDips.js';
+import { getMarketContext } from './fetchMarketContext.js';
+import { researchStockChanges } from './stockAgents.js';
 
 dotenv.config();
 
@@ -9,13 +11,27 @@ const client = new Anthropic({
 });
 
 async function main() {
-  const targetDate = new Date();
-  targetDate.setDate(targetDate.getDate() - 2);
+  if (!process.env.MASSIVE_API_KEY) throw new Error('MASSIVE_API_KEY is not set');
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set')
 
-  const largestDips = await getLargestStockDips(targetDate, 10, 10000000);
-  largestDips.forEach(dip => {
-    console.log(dip);
-  })
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 3);
+
+  console.log('Fetching market context...');
+  const marketContext = await getMarketContext(client, yesterday);
+  console.log('Market Context:');
+  console.log(marketContext);
+  console.log('---');
+
+  console.log('Fetching top dips...');
+  const dips = await getLargestStockDips(yesterday, 2, 100000);
+  dips.forEach(stock => {
+    console.log(`${stock.ticker}: ${stock.percentageChange.toFixed(2)}% | volume: ${stock.volume.toLocaleString()}`);
+  });
+
+  console.log('Analyzing stocks...');
+  const research = await researchStockChanges(client, dips, marketContext, yesterday);
+  research.forEach(res => console.log(`${res.stockChange.ticker} research`, res));
 }
 
-main();
+main().catch(console.error);

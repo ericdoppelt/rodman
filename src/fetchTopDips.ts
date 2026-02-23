@@ -1,13 +1,5 @@
 import axios from 'axios';
-import { apiResponseSchema, type StockResult } from './schemas.js';
-
-interface StockChange {
-  ticker: string;             // ticker symbol
-  open: number;               // open price
-  close: number;              // close price
-  percentageChange: number;      // drop (percentage)
-  volume: number
-}
+import { apiResponseSchema, type StockResult, type StockChange } from './schemas.js';
 
 function _formatDate(date: Date): string {
   const year = date.getFullYear();
@@ -79,19 +71,4 @@ export async function getLargestStockDips(date: Date, limit: number, minVolume?:
   const filteredStockResults = (minVolume !== undefined) ? stockResults.filter(sc => sc.v >= minVolume) : stockResults;
   const stockChanges = _createStockChanges(filteredStockResults);
   return _findLargestStockDips(stockChanges, limit);
-}
-
-/**
- * Fetches and returns stock data for a single ticker on the given date.
- * @param date is the date to look at.
- * @param ticker is the ticker symbol (e.g. "AI").
- * @returns The StockChange for that ticker, or null if not found.
- */
-export async function getStockDataForTicker(date: Date, ticker: string): Promise<StockChange | null> {
-  const stockResults = await _queryStockDataForDate(date);
-  const upper = ticker.toUpperCase();
-  const match = stockResults.find(r => r.T === upper);
-  if (!match) return null;
-  const [change] = _createStockChanges([match]);
-  return change;
 }
