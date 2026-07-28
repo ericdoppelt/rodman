@@ -62,3 +62,12 @@ export interface StockResearch {
   bull: StockAnalysis;
   bear: StockAnalysis;
 }
+
+export const MAX_PICKS = 1;
+
+export const stockPickSchema = z.array(z.object({
+  ticker: z.string(),
+  reasoning: z.string(),
+})).max(MAX_PICKS);
+
+export type StockPick = z.infer<typeof stockPickSchema>;

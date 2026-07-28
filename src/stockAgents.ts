@@ -1,47 +1,28 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { type StockChange, type Stance, anthropicResponseSchema, stockAnalysisSchema, type StockAnalysis, type TextBlock, type StockResearch } from './schemas.js';
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { type StockChange, type Stance, stockAnalysisSchema, type StockAnalysis, type StockResearch } from './schemas.js';
 
 const BULL_SYSTEM_PROMPT = `You are a balanced analyst tasked with making the strongest possible bull case for why a stock that dropped significantly represents a buying opportunity.
 
-You must respond with a JSON object matching this exact schema:
-{
-  "reasoning": "detailed prose analysis of why this is a buying opportunity",
-  "keyFactors": ["factor 1", "factor 2", "factor 3"],
-  "conviction": "strong" | "moderate" | "weak"
-}
-
 Rules:
 - reasoning must be a non-empty string
 - keyFactors must have between 3 and 5 items
-- conviction must be exactly "strong", "moderate", or "weak"
 - conviction reflects the strength of the EVIDENCE you found, not your enthusiasm. Use "weak" if evidence is thin or mixed, "moderate" if reasonable but not compelling, "strong" only if evidence clearly supports a buying opportunity
 - Focus your research on the specific date provided in the user message
-- Respond with JSON only. No markdown. No backticks. No other text.
-- If you need to search, search silently. Do not write any text before or after the JSON object.
+- If you need to search, search silently
 - Do not include citation tags like <cite> in your response
-- Write reasoning in plain prose without any XML or HTML tags
-- Your entire response must be a single valid JSON object and nothing else.`;
+- Write reasoning in plain prose without any XML or HTML tags`;
 
 const BEAR_SYSTEM_PROMPT = `You are a balanced analyst tasked with making the strongest possible bear case for why a stock that dropped significantly should NOT be bought.
 
-You must respond with a JSON object matching this exact schema:
-{
-  "reasoning": "detailed prose analysis of why this drop is justified or further downside is likely",
-  "keyFactors": ["factor 1", "factor 2", "factor 3"],
-  "conviction": "strong" | "moderate" | "weak"
-}
-
 Rules:
 - reasoning must be a non-empty string
 - keyFactors must have between 3 and 5 items
-- conviction must be exactly "strong", "moderate", or "weak"
 - conviction reflects the strength of the EVIDENCE you found, not your enthusiasm
 - Focus your research on the specific date provided in the user message
-- Respond with JSON only. No markdown. No backticks. No other text.
-- If you need to search, search silently. Do not write any text before or after the JSON object.
+- If you need to search, search silently
 - Do not include citation tags like <cite> in your response
-- Write reasoning in plain prose without any XML or HTML tags
-- Your entire response must be a single valid JSON object and nothing else.`;
+- Write reasoning in plain prose without any XML or HTML tags`;
 
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 4096;
@@ -92,12 +73,15 @@ async function _analyzeStockChangeWithStance(client: Anthropic, stockChange: Sto
     const formattedDate = date.toISOString().split('T')[0];
     const userPrompt = _getUserPrompt(stockChange, marketContext, date);
 
-    const rawResponse = await client.messages.create(
+    const response = await client.messages.parse(
         {
             model: MODEL,
             max_tokens: MAX_TOKENS,
             system: systemPrompt,
             tools: TOOLS,
+            output_config: {
+                format: zodOutputFormat(stockAnalysisSchema)
+            },
             messages: [{
                 role: 'user',
                 content: userPrompt
@@ -110,39 +94,11 @@ async function _analyzeStockChangeWithStance(client: Anthropic, stockChange: Sto
             throw error;
         });
 
-    const parsed = anthropicResponseSchema.safeParse(rawResponse);
-
-    if (!parsed.success) {
-        throw new Error(
-            `Anthropic response did not match expected shape for ${stockChange.ticker} for the ${stance} stance`
-        );
+    if (!response.parsed_output) {
+        throw new Error(`No parsed output for ${stockChange.ticker} and ${stance} stance (stop_reason: ${response.stop_reason})`);
     }
 
-    const textBlocks = parsed.data.content.filter(
-        (block): block is TextBlock => block.type === 'text'
-    );
-
-    if (textBlocks.length === 0) {
-        throw new Error(`No text response from market context agent for date: ${formattedDate}`);
-    }
-
-    const joinedText = textBlocks.map(tb => tb.text).join('');
-    const cleanJson = joinedText.replace(/```json|```/g, '').trim();
-    const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-        throw new Error(`No JSON found in response for ${stockChange.ticker} and ${stance} stance`);
-      }
-    // Extract JSON object even if Claude narrated around it
-    const parsedJson = JSON.parse(jsonMatch[0]);
-    const parsedJsonValidation = stockAnalysisSchema.safeParse(parsedJson);
-
-    if (!parsedJsonValidation.success) {
-        throw new Error(
-            `JSON response for ${stockChange.ticker} and ${stance} stance did not match expected shape`
-        );
-    }
-
-    return parsedJsonValidation.data;
+    return response.parsed_output;
 }
 
 export async function researchStockChanges(client: Anthropic, stockChanges: StockChange[], marketContext: string, date: Date): Promise<StockResearch[]> {

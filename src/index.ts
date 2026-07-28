@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { getLargestStockDips } from './fetchTopDips.js';
 import { getMarketContext } from './fetchMarketContext.js';
 import { researchStockChanges } from './stockAgents.js';
+import { pickStock } from './judgeResearch.js';
 
 dotenv.config();
 
@@ -32,6 +33,14 @@ async function main() {
   console.log('Analyzing stocks...');
   const research = await researchStockChanges(client, dips, marketContext, yesterday);
   research.forEach(res => console.log(`${res.stockChange.ticker} research`, res));
+
+  console.log('Judging research...');
+  const picks = await pickStock(client, research, yesterday);
+  if (picks.length === 0) {
+    console.log('No stock met the bar for a recommendation today.');
+  } else {
+    picks.forEach(pick => console.log(`PICK: ${pick.ticker} — ${pick.reasoning}`));
+  }
 }
 
 main().catch(console.error);
