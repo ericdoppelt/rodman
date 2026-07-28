@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { anthropicResponseSchema, type TextBlock } from './schemas.js';
+import { trackUsage } from './usageTracker.js';
 
 const SYSTEM_PROMPT = `You are an expert financial market research analyst with deep knowledge of macroeconomic conditions, sector trends, and market-moving events.
 
@@ -54,6 +55,8 @@ export async function getMarketContext(client: Anthropic, date: Date): Promise<s
     console.error('Failed to fetch market context for date:', formattedDate, error);
     throw error;
   });
+
+  trackUsage(MODEL, rawResponse.usage);
 
   const parsed = anthropicResponseSchema.safeParse(rawResponse);
   if (!parsed.success) {

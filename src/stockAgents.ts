@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { type StockChange, type Stance, stockAnalysisSchema, type StockAnalysis, type StockResearch } from './schemas.js';
+import { trackUsage } from './usageTracker.js';
 
 const BULL_SYSTEM_PROMPT = `You are a balanced analyst tasked with making the strongest possible bull case for why a stock that dropped significantly represents a buying opportunity.
 
@@ -93,6 +94,8 @@ async function _analyzeStockChangeWithStance(client: Anthropic, stockChange: Sto
             console.error(`Error analyzing stock ${stockChange.ticker} for the ${stance} stance`, error);
             throw error;
         });
+
+    trackUsage(MODEL, response.usage);
 
     if (!response.parsed_output) {
         throw new Error(`No parsed output for ${stockChange.ticker} and ${stance} stance (stop_reason: ${response.stop_reason})`);

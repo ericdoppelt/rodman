@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { type StockPick, type StockResearch, stockPickSchema, MAX_PICKS } from './schemas.js';
+import { trackUsage } from './usageTracker.js';
 
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 8096;
@@ -55,6 +56,8 @@ export async function pickStock(client: Anthropic, stockResearch: StockResearch[
         console.error(`Failed to judge stock research for date ${date}`, error);
         throw error;
     });
+
+    trackUsage(MODEL, response.usage);
 
     if (!response.parsed_output) {
         throw new Error(`No parsed output from judge for date ${formattedDate} (stop_reason: ${response.stop_reason})`);

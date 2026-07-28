@@ -4,6 +4,7 @@ import { getLargestStockDips } from './fetchTopDips.js';
 import { getMarketContext } from './fetchMarketContext.js';
 import { researchStockChanges } from './stockAgents.js';
 import { pickStock } from './judgeResearch.js';
+import { getTotalCost } from './usageTracker.js';
 
 dotenv.config();
 
@@ -41,6 +42,8 @@ async function main() {
   } else {
     picks.forEach(pick => console.log(`PICK: ${pick.ticker} — ${pick.reasoning}`));
   }
+
+  console.log(`Total cost: $${getTotalCost().toFixed(4)}`);
 }
 
 main().catch(console.error);
