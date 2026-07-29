@@ -49,9 +49,13 @@ async function _fetchMarketCap(ticker: string): Promise<number | undefined> {
       apiKey: process.env.MASSIVE_API_KEY,
     },
   }).catch(error => {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return null; // ticker not in Polygon's reference DB (delisted/OTC/etc.) — treat as no market cap data
+    }
     console.error('Failed to fetch ticker details for', ticker, error);
     throw error;
   });
+  if (response === null) return undefined;
 
   const parsed = tickerDetailsResponseSchema.safeParse(response.data);
   if (!parsed.success) {

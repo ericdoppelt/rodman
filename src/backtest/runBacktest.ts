@@ -16,11 +16,16 @@ const TEST_TRADING_DAYS = 30;
 const DIPS_PER_DAY = 2;
 // MIN_DOLLAR_VOLUME matches production's filter (see getLargestStockDips call in src/index.ts).
 // MIN_MARKET_CAP is deliberately higher than production's $100M floor — testing whether the
-// judge's edge holds on large-caps specifically. This means the candidate universe here is
+// judge's edge holds on larger companies specifically. This means the candidate universe here is
 // narrower than what the deployed pipeline actually sees; a result here doesn't say anything
-// about the small/micro-cap dips production still picks from.
+// about the small/micro-cap dips production still picks from. $10B was tried first but made the
+// market-cap scan (getLargestStockDips checks tickers one at a time, ranked by % drop) impractically
+// slow — true mega-caps rarely show up among the day's biggest percentage droppers, so the scan
+// could run for a very long time or exhaust the day's candidates without finding any. $2B is
+// still meaningfully "larger companies" while staying common enough among daily droppers to scan
+// in reasonable time.
 const MIN_DOLLAR_VOLUME = 10_000_000;
-const MIN_MARKET_CAP = 10_000_000_000;
+const MIN_MARKET_CAP = 2_000_000_000;
 // Holding periods to score a pick against. Primary metric is HORIZONS[0] — the bull/bear
 // reasoning is anchored to a specific catalyst on a specific day, and that catalyst's
 // relevance to price fades fast, so "a week" (5 trading days) is closer to what the judge is
