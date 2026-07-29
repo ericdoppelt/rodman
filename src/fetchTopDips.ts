@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { apiResponseSchema, tickerDetailsResponseSchema, type StockResult, type StockChange } from './schemas.js';
+import { apiResponseSchema, tickerDetailsResponseSchema, type StockResult, type StockChange, type RejectedCandidate } from './schemas.js';
 import { polygonRequest } from './rateLimit.js';
 
 function _formatDate(date: Date): string {
@@ -88,30 +88,37 @@ function _orderStockDipsDescending(stockChanges: StockChange[]): StockChange[] {
  * @param limit is the maximum number of stocks returned.
  * @param minMarketCap is the minimum market cap needed to be eligible; when set, dips are checked one at a time (in order
  * of largest drop first, rate-limited between calls) until `limit` qualifying stocks are found.
- * @returns StockChange[] which indicates the stocks with the largest drops on the specified day that meet the dollar volume
- * and market cap criteria.
+ * @returns `qualifying` StockChange[] with the largest drops that meet the dollar volume and market cap criteria,
+ * plus `rejected` candidates from the market-cap scan (and why each was excluded) for traceability.
  */
-export async function getLargestStockDips(date: Date, limit: number, minDollarVolume?: number, minMarketCap?: number): Promise<StockChange[]> {
+export async function getLargestStockDips(date: Date, limit: number, minDollarVolume?: number, minMarketCap?: number): Promise<{ qualifying: StockChange[]; rejected: RejectedCandidate[] }> {
   const stockResults = await _queryStockDataForDate(date);
   if (stockResults.length === 0) {
     console.warn('No stock results for date', date.toISOString().slice(0, 10), '(e.g. weekend/holiday or no data)');
-    return [];
+    return { qualifying: [], rejected: [] };
   }
   const filteredStockResults = (minDollarVolume !== undefined) ? stockResults.filter(sc => sc.v * sc.c >= minDollarVolume) : stockResults;
   const stockChanges = _createStockChanges(filteredStockResults);
   const orderedDips = _orderStockDipsDescending(stockChanges);
 
   if (minMarketCap === undefined) {
-    return orderedDips.slice(0, limit);
+    return { qualifying: orderedDips.slice(0, limit), rejected: [] };
   }
 
   const qualifyingDips: StockChange[] = [];
+  const rejected: RejectedCandidate[] = [];
   for (const stockChange of orderedDips) {
     if (qualifyingDips.length >= limit) break;
     const marketCap = await _fetchMarketCap(stockChange.ticker);
     if (marketCap !== undefined && marketCap >= minMarketCap) {
       qualifyingDips.push(stockChange);
+    } else {
+      rejected.push({
+        ticker: stockChange.ticker,
+        reason: marketCap === undefined ? 'no_market_cap_data' : 'below_min_market_cap',
+        details: { percentageChange: stockChange.percentageChange, marketCap: marketCap ?? null, minMarketCap },
+      });
     }
   }
-  return qualifyingDips;
+  return { qualifying: qualifyingDips, rejected };
 }

@@ -44,7 +44,7 @@ export const anthropicResponseSchema = z.object({
 type anthropicResponseSchema = z.infer<typeof anthropicResponseSchema>;
 
 export const stockAnalysisSchema = z.object({
-  reasoning: z.string(),
+  reasoning: z.string().min(1),
   keyFactors: z.array(z.string()).min(3).max(5),
   conviction: z.enum(['strong', 'moderate', 'weak']),
 });
@@ -71,11 +71,17 @@ export interface StockResearch {
   bear: StockAnalysis;
 }
 
+export interface RejectedCandidate {
+  ticker: string;
+  reason: string;
+  details?: Record<string, unknown>;
+}
+
 export const MAX_PICKS = 1;
 
 export const stockPickSchema = z.array(z.object({
-  ticker: z.string(),
-  reasoning: z.string(),
+  ticker: z.string().min(1),
+  reasoning: z.string().min(1),
 })).max(MAX_PICKS);
 
 export type StockPick = z.infer<typeof stockPickSchema>;

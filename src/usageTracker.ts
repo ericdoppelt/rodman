@@ -14,23 +14,25 @@ const PRICING: Record<string, ModelRates> = {
 
 const usageRecords: { model: string; usage: Anthropic.Usage }[] = [];
 
+export function calculateCallCost(model: string, usage: Anthropic.Usage): number {
+  const rates = PRICING[model];
+  if (!rates) {
+    console.warn(`No pricing configured for model ${model}, skipping in cost total`);
+    return 0;
+  }
+
+  const inputCost = (usage.input_tokens / 1_000_000) * rates.input;
+  const outputCost = (usage.output_tokens / 1_000_000) * rates.output;
+  const cacheWriteCost = ((usage.cache_creation_input_tokens ?? 0) / 1_000_000) * rates.cacheWrite;
+  const cacheReadCost = ((usage.cache_read_input_tokens ?? 0) / 1_000_000) * rates.cacheRead;
+
+  return inputCost + outputCost + cacheWriteCost + cacheReadCost;
+}
+
 export function trackUsage(model: string, usage: Anthropic.Usage): void {
   usageRecords.push({ model, usage });
 }
 
 export function getTotalCost(): number {
-  return usageRecords.reduce((total, { model, usage }) => {
-    const rates = PRICING[model];
-    if (!rates) {
-      console.warn(`No pricing configured for model ${model}, skipping in cost total`);
-      return total;
-    }
-
-    const inputCost = (usage.input_tokens / 1_000_000) * rates.input;
-    const outputCost = (usage.output_tokens / 1_000_000) * rates.output;
-    const cacheWriteCost = ((usage.cache_creation_input_tokens ?? 0) / 1_000_000) * rates.cacheWrite;
-    const cacheReadCost = ((usage.cache_read_input_tokens ?? 0) / 1_000_000) * rates.cacheRead;
-
-    return total + inputCost + outputCost + cacheWriteCost + cacheReadCost;
-  }, 0);
+  return usageRecords.reduce((total, { model, usage }) => total + calculateCallCost(model, usage), 0);
 }
