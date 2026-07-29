@@ -1,7 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { type StockChange, type Stance, stockAnalysisSchema, type StockAnalysis, type StockResearch } from './schemas.js';
-import { trackUsage } from './usageTracker.js';
+import { type StockChange, type Stance, stockAnalysisSchema, type StockAnalysis, type StockResearch, type RejectedCandidate } from './schemas.js';
+import { trackUsage, calculateCallCost } from './usageTracker.js';
+import { recordLlmCall, type RunRecordContext } from './db/llmCallStore.js';
+import { recordRejectedCandidate } from './db/runStore.js';
 
 export const BULL_SYSTEM_PROMPT = `You are a balanced analyst tasked with making the strongest possible bull case for why a stock that dropped significantly represents a buying opportunity.
 
@@ -45,10 +47,10 @@ function _getUserPrompt(stockChange: StockChange, marketContext: string, date: D
       Research ${stockChange.ticker} specifically and make your case. Focus on what caused this drop on ${date} and whether it represents an overreaction or justified decline.`;
 }
 
-async function _researchStock(client: Anthropic, stockChange: StockChange, marketContext: string, date: Date): Promise<StockResearch> {
+async function _researchStock(client: Anthropic, stockChange: StockChange, marketContext: string, date: Date, record?: RunRecordContext): Promise<StockResearch> {
     const [bullAnalysis, bearAnalysis] = await Promise.all([
-        _analyzeStockChangeWithStance(client, stockChange, 'bull', marketContext, date),
-        _analyzeStockChangeWithStance(client, stockChange, 'bear', marketContext, date)
+        _analyzeStockChangeWithStance(client, stockChange, 'bull', marketContext, date, record),
+        _analyzeStockChangeWithStance(client, stockChange, 'bear', marketContext, date, record)
     ]).catch(error => {
         console.error(`Unable to research stock ${stockChange.ticker}`, error);
         throw error;
@@ -69,11 +71,12 @@ async function _researchStock(client: Anthropic, stockChange: StockChange, marke
  * @param marketContext is the macro economic conditions for that day.
  * @returns a StockAnalysis indicating the stance, reasoning, key factors, and overall conviction.
  */
-async function _analyzeStockChangeWithStance(client: Anthropic, stockChange: StockChange, stance: Stance, marketContext: string, date: Date): Promise<StockAnalysis> {
+async function _analyzeStockChangeWithStance(client: Anthropic, stockChange: StockChange, stance: Stance, marketContext: string, date: Date, record?: RunRecordContext): Promise<StockAnalysis> {
     const systemPrompt: string = stance === 'bull' ? BULL_SYSTEM_PROMPT : BEAR_SYSTEM_PROMPT;
     const formattedDate = date.toISOString().split('T')[0];
     const userPrompt = _getUserPrompt(stockChange, marketContext, date);
 
+    const startTime = performance.now();
     const response = await client.messages.parse(
         {
             model: MODEL,
@@ -94,8 +97,24 @@ async function _analyzeStockChangeWithStance(client: Anthropic, stockChange: Sto
             console.error(`Error analyzing stock ${stockChange.ticker} for the ${stance} stance`, error);
             throw error;
         });
+    const latencyMs = Math.round(performance.now() - startTime);
 
     trackUsage(MODEL, response.usage);
+
+    if (record) {
+        await recordLlmCall(record.supabase, {
+            runId: record.runId,
+            callType: stance,
+            ticker: stockChange.ticker,
+            model: MODEL,
+            systemPrompt,
+            userPrompt,
+            rawResponse: response,
+            usage: response.usage,
+            costUsd: calculateCallCost(MODEL, response.usage),
+            latencyMs,
+        });
+    }
 
     if (!response.parsed_output) {
         throw new Error(`No parsed output for ${stockChange.ticker} and ${stance} stance (stop_reason: ${response.stop_reason})`);
@@ -104,8 +123,24 @@ async function _analyzeStockChangeWithStance(client: Anthropic, stockChange: Sto
     return response.parsed_output;
 }
 
-export async function researchStockChanges(client: Anthropic, stockChanges: StockChange[], marketContext: string, date: Date): Promise<StockResearch[]> {
-    const settledResearchResults = await Promise.allSettled(stockChanges.map(stockChange => _researchStock(client, stockChange, marketContext, date)))
-    const filteredFulfilledResearchResults = settledResearchResults.filter((result): result is PromiseFulfilledResult<StockResearch> => result.status === 'fulfilled');
-    return filteredFulfilledResearchResults.map(res => res.value);
+export async function researchStockChanges(client: Anthropic, stockChanges: StockChange[], marketContext: string, date: Date, record?: RunRecordContext): Promise<{ research: StockResearch[]; rejected: RejectedCandidate[] }> {
+    const settledResearchResults = await Promise.allSettled(stockChanges.map(stockChange => _researchStock(client, stockChange, marketContext, date, record)));
+
+    const research: StockResearch[] = [];
+    const rejected: RejectedCandidate[] = [];
+
+    for (const [index, result] of settledResearchResults.entries()) {
+        if (result.status === 'fulfilled') {
+            research.push(result.value);
+        } else {
+            const ticker = stockChanges[index]!.ticker;
+            const errorMessage = result.reason instanceof Error ? result.reason.message : String(result.reason);
+            rejected.push({ ticker, reason: 'research_failed', details: { error: errorMessage } });
+            if (record) {
+                await recordRejectedCandidate(record.supabase, record.runId, ticker, 'research_failed', { error: errorMessage });
+            }
+        }
+    }
+
+    return { research, rejected };
 }

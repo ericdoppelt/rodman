@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { anthropicResponseSchema, type TextBlock } from './schemas.js';
-import { trackUsage } from './usageTracker.js';
+import { trackUsage, calculateCallCost } from './usageTracker.js';
+import { recordLlmCall, type RunRecordContext } from './db/llmCallStore.js';
 
 const SYSTEM_PROMPT = `You are an expert financial market research analyst with deep knowledge of macroeconomic conditions, sector trends, and market-moving events.
 
@@ -37,9 +38,11 @@ const TIMEOUT = 180_000;
  * @param date is the date to get context on.
  * @returns a string containing market context. 
  */
-export async function getMarketContext(client: Anthropic, date: Date): Promise<string> {
+export async function getMarketContext(client: Anthropic, date: Date, record?: RunRecordContext): Promise<string> {
   const formattedDate = date.toISOString().split('T')[0];
+  const userPrompt = `Research and summarize the macro market conditions for ${formattedDate}. What was happening in the market that day that could explain significant stock drops?`;
 
+  const startTime = performance.now();
   const rawResponse = await client.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
@@ -47,7 +50,7 @@ export async function getMarketContext(client: Anthropic, date: Date): Promise<s
     tools: TOOLS,
     messages: [{
       role: 'user',
-      content: `Research and summarize the macro market conditions for ${formattedDate}. What was happening in the market that day that could explain significant stock drops?`
+      content: userPrompt
     }]
   }, {
     timeout: TIMEOUT, // per request timeout
@@ -55,8 +58,23 @@ export async function getMarketContext(client: Anthropic, date: Date): Promise<s
     console.error('Failed to fetch market context for date:', formattedDate, error);
     throw error;
   });
+  const latencyMs = Math.round(performance.now() - startTime);
 
   trackUsage(MODEL, rawResponse.usage);
+
+  if (record) {
+    await recordLlmCall(record.supabase, {
+      runId: record.runId,
+      callType: 'market_context',
+      model: MODEL,
+      systemPrompt: SYSTEM_PROMPT,
+      userPrompt,
+      rawResponse,
+      usage: rawResponse.usage,
+      costUsd: calculateCallCost(MODEL, rawResponse.usage),
+      latencyMs,
+    });
+  }
 
   const parsed = anthropicResponseSchema.safeParse(rawResponse);
   if (!parsed.success) {

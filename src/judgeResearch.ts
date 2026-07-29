@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { type StockPick, type StockResearch, stockPickSchema, MAX_PICKS } from './schemas.js';
-import { trackUsage } from './usageTracker.js';
+import { trackUsage, calculateCallCost } from './usageTracker.js';
+import { recordLlmCall, type RunRecordContext } from './db/llmCallStore.js';
 
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 8096;
@@ -34,10 +35,11 @@ function _getUserPrompt(stockResearch: StockResearch[], formattedDate: string | 
     return `Today is ${formattedDate}. Evaluate these stocks and decide which if any to recommend buying. Pick 0 stocks if you are not confident, and at most 1 if you are. \n\n${stockSummaries}`;
 }
 
-export async function pickStock(client: Anthropic, stockResearch: StockResearch[], date: Date): Promise<StockPick> {
+export async function pickStock(client: Anthropic, stockResearch: StockResearch[], date: Date, record?: RunRecordContext): Promise<StockPick> {
     const formattedDate = date.toISOString().split('T')[0];
 
     const userPrompt = _getUserPrompt(stockResearch, formattedDate);
+    const startTime = performance.now();
     const response = await client.messages.parse({
         model: MODEL,
         max_tokens: MAX_TOKENS,
@@ -56,8 +58,23 @@ export async function pickStock(client: Anthropic, stockResearch: StockResearch[
         console.error(`Failed to judge stock research for date ${date}`, error);
         throw error;
     });
+    const latencyMs = Math.round(performance.now() - startTime);
 
     trackUsage(MODEL, response.usage);
+
+    if (record) {
+        await recordLlmCall(record.supabase, {
+            runId: record.runId,
+            callType: 'judge',
+            model: MODEL,
+            systemPrompt: JUDGE_SYSTEM_PROMPT,
+            userPrompt,
+            rawResponse: response,
+            usage: response.usage,
+            costUsd: calculateCallCost(MODEL, response.usage),
+            latencyMs,
+        });
+    }
 
     if (!response.parsed_output) {
         throw new Error(`No parsed output from judge for date ${formattedDate} (stop_reason: ${response.stop_reason})`);

@@ -98,7 +98,7 @@ async function main() {
     triedDates.add(dateKey);
 
     console.log(`\n--- ${dateKey} (sample ${sampleAttempts}) ---`);
-    const dips = await getLargestStockDips(testDate, DIPS_PER_DAY, MIN_DOLLAR_VOLUME, MIN_MARKET_CAP);
+    const { qualifying: dips } = await getLargestStockDips(testDate, DIPS_PER_DAY, MIN_DOLLAR_VOLUME, MIN_MARKET_CAP);
     if (dips.length === 0) {
       console.log('No qualifying dips (weekend/holiday/no data) — skipping.');
       continue;
