@@ -5,6 +5,7 @@ import { getMarketContext } from './fetchMarketContext.js';
 import { researchStockChanges } from './stockAgents.js';
 import { pickStock } from './judgeResearch.js';
 import { getTotalCost } from './usageTracker.js';
+import { logRun } from './backtest/logRun.js';
 
 dotenv.config();
 
@@ -17,7 +18,7 @@ async function main() {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set')
 
   const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 3);
+  yesterday.setDate(yesterday.getDate() - 1);
 
   console.log('Fetching market context...');
   const marketContext = await getMarketContext(client, yesterday);
@@ -26,7 +27,7 @@ async function main() {
   console.log('---');
 
   console.log('Fetching top dips...');
-  const dips = await getLargestStockDips(yesterday, 2, 100000);
+  const dips = await getLargestStockDips(yesterday, 2, 10000000, 100000000);
   dips.forEach(stock => {
     console.log(`${stock.ticker}: ${stock.percentageChange.toFixed(2)}% | volume: ${stock.volume.toLocaleString()}`);
   });
@@ -44,6 +45,14 @@ async function main() {
   }
 
   console.log(`Total cost: $${getTotalCost().toFixed(4)}`);
+
+  logRun({
+    date: yesterday.toISOString().slice(0, 10),
+    marketContext,
+    dips,
+    research,
+    picks,
+  });
 }
 
 main().catch(console.error);

@@ -18,6 +18,14 @@ export const apiResponseSchema = z.object({
 
 export type ApiResponse = z.infer<typeof apiResponseSchema>;
 
+export const tickerDetailsResponseSchema = z.object({
+  results: z.object({
+    market_cap: z.number().optional(),
+  }),
+});
+
+export type TickerDetailsResponse = z.infer<typeof tickerDetailsResponseSchema>;
+
 const textBlockSchema = z.object({
   type: z.literal('text'),
   text: z.string(),
@@ -71,3 +79,32 @@ export const stockPickSchema = z.array(z.object({
 })).max(MAX_PICKS);
 
 export type StockPick = z.infer<typeof stockPickSchema>;
+
+// --- Backtest-only schemas ---
+
+export const tickerAggResultSchema = z.object({
+  t: z.number(), // bar timestamp (ms)
+  o: z.number(),
+  c: z.number(),
+  h: z.number(),
+  l: z.number(),
+  v: z.number(),
+});
+
+export const tickerRangeAggsResponseSchema = z.object({
+  status: z.string(),
+  results: z.array(tickerAggResultSchema).optional().default([]),
+});
+
+export const polygonNewsItemSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+  published_utc: z.string(),
+  article_url: z.string().optional(),
+});
+
+export type PolygonNewsItem = z.infer<typeof polygonNewsItemSchema>;
+
+export const polygonNewsResponseSchema = z.object({
+  results: z.array(polygonNewsItemSchema).optional().default([]),
+});

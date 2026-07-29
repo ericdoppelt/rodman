@@ -3,7 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { type StockChange, type Stance, stockAnalysisSchema, type StockAnalysis, type StockResearch } from './schemas.js';
 import { trackUsage } from './usageTracker.js';
 
-const BULL_SYSTEM_PROMPT = `You are a balanced analyst tasked with making the strongest possible bull case for why a stock that dropped significantly represents a buying opportunity.
+export const BULL_SYSTEM_PROMPT = `You are a balanced analyst tasked with making the strongest possible bull case for why a stock that dropped significantly represents a buying opportunity.
 
 Rules:
 - reasoning must be a non-empty string
@@ -14,7 +14,7 @@ Rules:
 - Do not include citation tags like <cite> in your response
 - Write reasoning in plain prose without any XML or HTML tags`;
 
-const BEAR_SYSTEM_PROMPT = `You are a balanced analyst tasked with making the strongest possible bear case for why a stock that dropped significantly should NOT be bought.
+export const BEAR_SYSTEM_PROMPT = `You are a balanced analyst tasked with making the strongest possible bear case for why a stock that dropped significantly should NOT be bought.
 
 Rules:
 - reasoning must be a non-empty string
@@ -25,8 +25,8 @@ Rules:
 - Do not include citation tags like <cite> in your response
 - Write reasoning in plain prose without any XML or HTML tags`;
 
-const MODEL = 'claude-haiku-4-5-20251001';
-const MAX_TOKENS = 4096;
+export const MODEL = 'claude-haiku-4-5-20251001';
+export const MAX_TOKENS = 4096;
 const TOOLS: Anthropic.Messages.WebSearchTool20250305[] = [
     {
         type: 'web_search_20250305',
@@ -34,7 +34,7 @@ const TOOLS: Anthropic.Messages.WebSearchTool20250305[] = [
         max_uses: 1
     }
 ];
-const TIMEOUT = 180_000;
+export const TIMEOUT = 180_000;
 
 function _getUserPrompt(stockChange: StockChange, marketContext: string, date: Date): string {
     return `Analyze ${stockChange.ticker} which dropped ${stockChange.percentageChange.toFixed(2)}% on ${date} with volume of ${stockChange.volume.toLocaleString()}.
