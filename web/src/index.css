@@ -1,0 +1,157 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #2563eb;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2a2d34;
+    --accent: #60a5fa;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.75rem;
+}
+
+.subtitle {
+  color: var(--muted);
+  margin: 0 0 2rem;
+}
+
+.error {
+  color: #dc2626;
+}
+
+.runs {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.run {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+}
+
+.run-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.run-header h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.cost {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.no-pick {
+  color: var(--muted);
+  margin: 0;
+}
+
+.picks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pick {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.75rem;
+}
+
+.ticker {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.reasoning {
+  margin: 0.25rem 0 0;
+  color: var(--fg);
+  line-height: 1.45;
+}
+
+.pick-return {
+  margin: 0.75rem 0 0.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pick-return.up {
+  color: #16a34a;
+}
+
+.pick-return.down {
+  color: #dc2626;
+}
+
+.pick-return.flat {
+  color: var(--muted);
+}
+
+.pick-chart-wrap {
+  position: relative;
+  margin-top: 0.25rem;
+}
+
+.pick-chart-entry-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed var(--fg);
+  pointer-events: none;
+}
+
+.pick-chart-entry-line span {
+  position: absolute;
+  top: -2px;
+  left: 4px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.chart-pending {
+  margin-top: 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}

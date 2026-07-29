@@ -48,7 +48,8 @@ This surfaces genuine uncertainty. If both arguments are strong, the judge says 
 
 - Runs nightly via a GitHub Actions cron (`.github/workflows/daily-run.yml`)
 - Every run — market context, per-stock research, picks, rejected candidates, and raw LLM calls — is persisted to Supabase (`runs`, `llm_calls`, `picks`, `rejected_candidates` tables; see `supabase/schema.sql`)
-- **Not yet built:** frontend with a date picker to review past days, and an email summary
+- A read-only client UI (`web/`) shows completed runs and picks, reading Supabase directly with the `anon` key — see Web UI below
+- **Not yet built:** email summary
 - **In progress (V2):** feedback loop comparing past recommendations to actual stock performance over time — see Backtesting below
 
 ---
@@ -91,6 +92,23 @@ Live `web_search` can't be restricted to a historical date, so any backtest that
 2. **`pnpm score-forward-test`** (`scoreForwardTest.ts`) — scores real production runs (logged by `logRun.ts` on every `pnpm start`) once enough time has passed for a forward return to exist. This is the only validation of the actual deployed pipeline, since live search results can't be replayed for past dates. Needs weeks of accumulated runs before it's meaningful.
 
 See `BACKLOG.md` for current results and known gaps (e.g. no reasoning-quality grading yet, only outcome-based scoring).
+
+---
+
+## Web UI
+
+`web/` is a Vite + React SPA that reads completed runs and picks directly from Supabase using the `anon` key — no backend of its own. Row Level Security scopes what that key can see: only `runs` with `status = 'completed'` and their `picks`/`pick_price_series` are readable; `llm_calls` and `rejected_candidates` have RLS enabled with no policy, so they're fully locked out from anon/authenticated access (see `supabase/schema.sql` and `docs/decisions/0002-client-ui-and-rls-scope.md`).
+
+Each pick's chart (`web/src/components/PickChart.tsx`) is rendered client-side with TradingView's open-source [Lightweight Charts](https://github.com/tradingview/lightweight-charts) library, fed by a per-pick hourly price series (from a week before the pick through today; `pick_price_series` table) that `pnpm update-pick-price-series` (`src/updatePickPriceSeries.ts`) refreshes once a day as part of the GitHub Actions cron, reusing the same Massive/Polygon key and rate-limit backoff as the main pipeline — no separate backend or live per-request calls.
+
+```bash
+cd web
+pnpm install
+cp .env.example .env.local   # fill in VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+pnpm dev
+```
+
+Intended to be deployed to Vercel as a static build (`pnpm build`).
 
 ---
 

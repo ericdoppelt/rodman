@@ -44,6 +44,51 @@ create table if not exists rejected_candidates (
   created_at timestamptz not null default now()
 );
 
+create table if not exists pick_price_series (
+  pick_id uuid primary key references picks(id) on delete cascade,
+  series jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists idx_llm_calls_run_id on llm_calls(run_id);
 create index if not exists idx_picks_run_id on picks(run_id);
 create index if not exists idx_rejected_candidates_run_id on rejected_candidates(run_id);
+
+-- RLS: service_role (cron/pipeline) bypasses RLS entirely. These policies only govern
+-- anon/authenticated access, i.e. the client-facing web UI reading with the anon key.
+alter table runs enable row level security;
+alter table llm_calls enable row level security;
+alter table picks enable row level security;
+alter table rejected_candidates enable row level security;
+alter table pick_price_series enable row level security;
+
+-- Public read access: only completed runs and their picks. 'running'/'failed' rows (which
+-- can carry internal error text) stay hidden, and llm_calls/rejected_candidates have no
+-- policy at all, so anon/authenticated get zero access to them.
+create policy "public can read completed runs"
+  on runs for select
+  to anon, authenticated
+  using (status = 'completed');
+
+create policy "public can read picks for completed runs"
+  on picks for select
+  to anon, authenticated
+  using (
+    exists (
+      select 1 from runs
+      where runs.id = picks.run_id
+      and runs.status = 'completed'
+    )
+  );
+
+create policy "public can read price series for completed runs"
+  on pick_price_series for select
+  to anon, authenticated
+  using (
+    exists (
+      select 1 from picks
+      join runs on runs.id = picks.run_id
+      where picks.id = pick_price_series.pick_id
+      and runs.status = 'completed'
+    )
+  );
