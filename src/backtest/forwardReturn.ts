@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { tickerRangeAggsResponseSchema } from '../schemas.js';
-import { throttlePolygonCall } from '../rateLimit.js';
+import { polygonRequest } from '../rateLimit.js';
 
 function _formatDate(date: Date): string {
   const year = date.getFullYear();
@@ -31,14 +31,13 @@ export async function getForwardReturns(ticker: string, fromDate: Date, tradingD
   toDate.setDate(toDate.getDate() + Math.ceil(maxHorizon * 1.6) + 5);
 
   const endpoint = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/1/day/${_formatDate(fromDate)}/${_formatDate(toDate)}`;
-  await throttlePolygonCall();
-  const response = await axios.get(endpoint, {
+  const response = await polygonRequest(() => axios.get(endpoint, {
     params: {
       adjusted: true,
       sort: 'asc',
       apiKey: process.env.MASSIVE_API_KEY,
     },
-  }).catch(error => {
+  })).catch(error => {
     console.error(`Failed to fetch forward-return range for ${ticker}`, error);
     throw error;
   });

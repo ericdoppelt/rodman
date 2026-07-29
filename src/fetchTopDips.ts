@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { apiResponseSchema, tickerDetailsResponseSchema, type StockResult, type StockChange } from './schemas.js';
-import { throttlePolygonCall } from './rateLimit.js';
+import { polygonRequest } from './rateLimit.js';
 
 function _formatDate(date: Date): string {
   const year = date.getFullYear();
@@ -12,13 +12,12 @@ function _formatDate(date: Date): string {
 async function _queryStockDataForDate(date: Date): Promise<StockResult[]> {
   const formattedDate = _formatDate(date);
   const endpoint = 'https://api.polygon.io/v2/aggs/grouped/locale/us/market/stocks/' + formattedDate;
-  await throttlePolygonCall();
-  const response = await axios.get(endpoint, {
+  const response = await polygonRequest(() => axios.get(endpoint, {
     params: {
       adjusted: true,
       apiKey: process.env.MASSIVE_API_KEY,
     },
-  }).catch(error => {
+  })).catch(error => {
     console.error('Failed to fetch stock data for date:', date, error);
     throw error;
   });
@@ -43,12 +42,11 @@ function _calculatePercentageChange(open: number, close: number): number {
 
 async function _fetchMarketCap(ticker: string): Promise<number | undefined> {
   const endpoint = `https://api.polygon.io/v3/reference/tickers/${ticker}`;
-  await throttlePolygonCall();
-  const response = await axios.get(endpoint, {
+  const response = await polygonRequest(() => axios.get(endpoint, {
     params: {
       apiKey: process.env.MASSIVE_API_KEY,
     },
-  }).catch(error => {
+  })).catch(error => {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
       return null; // ticker not in Polygon's reference DB (delisted/OTC/etc.) — treat as no market cap data
     }

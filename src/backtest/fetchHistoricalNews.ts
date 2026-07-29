@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { polygonNewsResponseSchema, type PolygonNewsItem } from '../schemas.js';
-import { throttlePolygonCall } from '../rateLimit.js';
+import { polygonRequest } from '../rateLimit.js';
 
 function _formatDate(date: Date): string {
   const year = date.getFullYear();
@@ -17,8 +17,7 @@ function _formatDate(date: Date): string {
  */
 export async function getHistoricalNews(ticker: string, beforeDate: Date, limit = 5): Promise<PolygonNewsItem[]> {
   const endpoint = 'https://api.polygon.io/v2/reference/news';
-  await throttlePolygonCall();
-  const response = await axios.get(endpoint, {
+  const response = await polygonRequest(() => axios.get(endpoint, {
     params: {
       ticker,
       'published_utc.lte': _formatDate(beforeDate),
@@ -27,7 +26,7 @@ export async function getHistoricalNews(ticker: string, beforeDate: Date, limit 
       limit,
       apiKey: process.env.MASSIVE_API_KEY,
     },
-  }).catch(error => {
+  })).catch(error => {
     console.error(`Failed to fetch historical news for ${ticker}`, error);
     throw error;
   });
