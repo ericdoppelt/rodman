@@ -93,3 +93,28 @@ create policy "public can read price series for completed runs"
       and runs.status = 'completed'
     )
   );
+
+-- Exposes the research process (market context, bull/bear cases, judge call) and
+-- pre-research rejections for the per-run "how this pick was made" flow view.
+-- See docs/decisions/0010-expose-llm-calls-and-rejects-via-rls.md.
+create policy "public can read llm calls for completed runs"
+  on llm_calls for select
+  to anon, authenticated
+  using (
+    exists (
+      select 1 from runs
+      where runs.id = llm_calls.run_id
+      and runs.status = 'completed'
+    )
+  );
+
+create policy "public can read rejected candidates for completed runs"
+  on rejected_candidates for select
+  to anon, authenticated
+  using (
+    exists (
+      select 1 from runs
+      where runs.id = rejected_candidates.run_id
+      and runs.status = 'completed'
+    )
+  );

@@ -417,6 +417,16 @@ main {
 
 /* ---------- Pulse loader ---------- */
 
+/* Fills the remaining viewport below the header so the loading state reads
+   as "the page is loading" rather than a small icon floating over an
+   otherwise-empty page. */
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
 .pulse-loader {
   display: flex;
   flex-direction: column;
@@ -553,5 +563,307 @@ main {
 
   .pulse-bar {
     animation: none !important;
+  }
+
+  .flow-candidate,
+  .flow-step {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- Run flow page ---------- */
+
+.pick-card {
+  cursor: pointer;
+}
+
+.pick-card-toggle {
+  display: block;
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  transition: color 0.2s ease;
+}
+
+.pick-card:hover .pick-card-toggle,
+.pick-card:focus-visible .pick-card-toggle {
+  color: var(--accent);
+}
+
+.no-pick-card {
+  cursor: pointer;
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  background: color-mix(in srgb, var(--glass-bg-strong) 60%, transparent);
+  border: 1px solid var(--border);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.no-pick-card:hover,
+.no-pick-card:focus-visible {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-hover);
+}
+
+.no-pick-card .no-pick {
+  margin: 0;
+}
+
+.flow-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.flow-back {
+  background: none;
+  border: none;
+  color: var(--ink-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 1.5rem;
+}
+
+.flow-back:hover {
+  color: var(--accent);
+}
+
+.flow-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.flow-header h1 {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  margin: 0;
+}
+
+.flow-inline-loading {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 0;
+}
+
+.flow-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding-left: 1.1rem;
+  border-left: 1px dashed var(--gridline);
+}
+
+.flow-step h2 {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+  position: relative;
+}
+
+.flow-step h2::before {
+  content: '';
+  position: absolute;
+  left: -1.63rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--bg-page);
+}
+
+.flow-card {
+  border-radius: 14px;
+  padding: 1rem 1.15rem;
+  background: color-mix(in srgb, var(--glass-bg-strong) 60%, transparent);
+  border: 1px solid var(--border);
+}
+
+.flow-context-text {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.6;
+  font-size: 0.92rem;
+  white-space: pre-wrap;
+}
+
+.flow-chip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.flow-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: var(--muted-wash);
+  border: 1px solid var(--border);
+}
+
+.flow-chip-reason {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.flow-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.flow-candidate {
+  border-radius: 14px;
+  padding: 1rem 1.15rem;
+  background: color-mix(in srgb, var(--glass-bg-strong) 60%, transparent);
+  border: 1px solid var(--border);
+}
+
+.flow-candidate--picked {
+  border-color: var(--accent-3);
+  box-shadow: 0 0 0 1px var(--accent-3);
+}
+
+.flow-candidate--failed {
+  opacity: 0.75;
+}
+
+.flow-candidate-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.flow-picked-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  color: var(--accent-3);
+  background: color-mix(in srgb, var(--accent-3) 14%, transparent);
+}
+
+.flow-picked-badge--failed {
+  color: var(--ink-muted);
+  background: var(--muted-wash);
+}
+
+.flow-cases {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.flow-case {
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  border-left: 3px solid var(--gridline);
+}
+
+.flow-case--bull {
+  border-left-color: var(--status-good);
+  background: color-mix(in srgb, var(--status-good-wash) 45%, transparent);
+}
+
+.flow-case--bear {
+  border-left-color: var(--status-critical);
+  background: color-mix(in srgb, var(--status-critical-wash) 45%, transparent);
+}
+
+.flow-case-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.flow-case p {
+  margin: 0 0 0.5rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.flow-case ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+  color: var(--ink-secondary);
+  line-height: 1.5;
+}
+
+.flow-case-missing {
+  color: var(--ink-muted);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+.conviction {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+}
+
+.flow-case--bull .conviction--strong {
+  color: var(--status-good);
+  background: var(--status-good-wash);
+}
+
+.flow-case--bear .conviction--strong {
+  color: var(--status-critical);
+  background: var(--status-critical-wash);
+}
+
+.conviction--moderate {
+  color: var(--ink-secondary);
+  background: var(--muted-wash);
+}
+
+.conviction--weak {
+  color: var(--ink-muted);
+  background: var(--muted-wash);
+}
+
+.flow-judge-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.flow-meta {
+  margin: 0.75rem 0 0;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .flow-cases {
+    grid-template-columns: 1fr;
   }
 }

@@ -5,6 +5,8 @@ import { computeMetrics } from './lib/metrics';
 import { RunSection } from './components/RunSection';
 import { StatTile } from './components/StatTile';
 import { PulseLoader } from './components/PulseLoader';
+import { RunFlowPage } from './components/RunFlowPage';
+import { useHashRunId } from './hooks/useHashRoute';
 
 function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-').map(Number);
@@ -27,6 +29,7 @@ function App() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const flowRunId = useHashRunId();
 
   useEffect(() => {
     const fetchRuns = supabase
@@ -59,13 +62,20 @@ function App() {
         <span className="bg-blob bg-blob--c" />
       </div>
 
+      {flowRunId ? (
+        <RunFlowPage runId={flowRunId} />
+      ) : (
       <main>
         <header className="hero">
           <h1>Rodman</h1>
           <p className="subtitle">Daily dip-buy picks from an automated research pipeline.</p>
         </header>
 
-        {loading && <PulseLoader />}
+        {loading && (
+          <div className="loading-screen">
+            <PulseLoader />
+          </div>
+        )}
 
         {error && <p className="error">Failed to load runs: {error}</p>}
 
@@ -112,6 +122,7 @@ function App() {
           </>
         )}
       </main>
+      )}
     </>
   );
 }

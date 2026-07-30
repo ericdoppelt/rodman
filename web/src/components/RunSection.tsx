@@ -1,6 +1,7 @@
 import type { Run } from '../types';
 import { PickCard } from './PickCard';
 import { useInView } from '../hooks/useInView';
+import { openRunFlow } from '../hooks/useHashRoute';
 
 function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-').map(Number);
@@ -25,7 +26,21 @@ export function RunSection({ run }: Props) {
         {run.total_cost_usd != null && <span className="cost">${run.total_cost_usd.toFixed(4)}</span>}
       </div>
       {run.picks.length === 0 ? (
-        <p className="no-pick">No pick met the bar this day.</p>
+        <div
+          className="no-pick-card"
+          role="button"
+          tabIndex={0}
+          onClick={() => openRunFlow(run.id)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              openRunFlow(run.id);
+            }
+          }}
+        >
+          <p className="no-pick">No pick met the bar this day.</p>
+          <span className="pick-card-toggle">View research process →</span>
+        </div>
       ) : (
         <ul className="picks">
           {run.picks.map((pick, index) => (
