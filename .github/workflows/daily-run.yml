@@ -2,8 +2,9 @@ name: Daily stock pick
 
 on:
   schedule:
-    # 11:00 UTC (~6-7am ET) daily — after the prior US trading day's data is available on Polygon.
-    - cron: '0 11 * * *'
+    # 11:00 UTC (~6-7am ET), Tue-Sat — covers "yesterday" being Mon-Fri (US trading days).
+    # Market holidays within that window still fire; the app checks for no data and skips the run.
+    - cron: '0 11 * * 2-6'
   workflow_dispatch: {}
 
 jobs:

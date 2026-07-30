@@ -39,20 +39,25 @@ async function main() {
   const record = { supabase, runId };
 
   try {
-    console.log('Fetching market context...');
-    const marketContext = await getMarketContext(client, yesterday, record);
-    console.log('Market Context:');
-    console.log(marketContext);
-    console.log('---');
-
     console.log('Fetching top dips...');
-    const { qualifying: dips, rejected: rejectedDips } = await getLargestStockDips(yesterday, DIPS_LIMIT, MIN_DOLLAR_VOLUME, MIN_MARKET_CAP);
+    const { qualifying: dips, rejected: rejectedDips, allResults } = await getLargestStockDips(yesterday, DIPS_LIMIT, MIN_DOLLAR_VOLUME, MIN_MARKET_CAP);
+    if (allResults.length === 0) {
+      console.log('No stock data for', runDate, '(market holiday or no data) — skipping run.');
+      await finalizeRun(supabase, runId, 0);
+      return;
+    }
     dips.forEach(stock => {
       console.log(`${stock.ticker}: ${stock.percentageChange.toFixed(2)}% | volume: ${stock.volume.toLocaleString()}`);
     });
     for (const candidate of rejectedDips) {
       await recordRejectedCandidate(supabase, runId, candidate.ticker, candidate.reason, candidate.details);
     }
+
+    console.log('Fetching market context...');
+    const marketContext = await getMarketContext(client, yesterday, record);
+    console.log('Market Context:');
+    console.log(marketContext);
+    console.log('---');
 
     console.log('Analyzing stocks...');
     const { research, rejected: rejectedResearch } = await researchStockChanges(client, dips, marketContext, yesterday, record);
