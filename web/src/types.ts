@@ -8,6 +8,7 @@ export interface Pick {
   run_id: string;
   ticker: string;
   reasoning: string;
+  entry_price: number | null;
   created_at: string;
   pick_price_series: { series: PriceSeriesPoint[] } | null;
 }

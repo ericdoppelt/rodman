@@ -32,6 +32,7 @@ create table if not exists picks (
   run_id uuid not null references runs(id) on delete cascade,
   ticker text not null,
   reasoning text not null,
+  entry_price numeric(12, 4),
   created_at timestamptz not null default now()
 );
 

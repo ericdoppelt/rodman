@@ -19,7 +19,7 @@ export function PickCard({ pick, runDate, index }: Props) {
     >
       <span className="ticker">{pick.ticker}</span>
       <p className="reasoning">{pick.reasoning}</p>
-      <PickChart series={pick.pick_price_series?.series ?? []} pickDate={runDate} />
+      <PickChart series={pick.pick_price_series?.series ?? []} pickDate={runDate} entryPrice={pick.entry_price} />
     </li>
   );
 }

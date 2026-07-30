@@ -1,10 +1,12 @@
-name: Daily stock pick
+name: Update pick price series
 
 on:
   schedule:
-    # 11:00 UTC (~6-7am ET), Tue-Sat — covers "yesterday" being Mon-Fri (US trading days).
-    # Market holidays within that window still fire; the app checks for no data and skips the run.
-    - cron: '0 11 * * 2-6'
+    # Every 30 min, 13:00-21:30 UTC (~9am-5:30pm ET), Mon-Fri — covers premarket through
+    # after-hours around a normal trading session. At today's pick volume (1/weekday, refetching
+    # full history each run) this is well within Polygon's free-tier 5-calls/min limit; see
+    # BACKLOG.md for the incremental-fetch work needed before pushing cadence much higher.
+    - cron: '0,30 13-21 * * 1-5'
   workflow_dispatch: {}
 
 jobs:
@@ -22,9 +24,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm start
+      - run: pnpm update-pick-price-series
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

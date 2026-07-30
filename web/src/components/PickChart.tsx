@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { createChart, AreaSeries, type UTCTimestamp } from 'lightweight-charts';
 import type { PriceSeriesPoint } from '../types';
-import { computePickReturn, findEntryIndex, type Trend } from '../lib/trend';
+import { computePickReturn, withEntryPoint, marketCloseUnixSeconds, type Trend } from '../lib/trend';
 import { TrendIcon } from './TrendIcon';
 
 function prefersDark(): boolean {
@@ -21,18 +21,18 @@ function colorForTrend(trend: Trend): { line: string; top: string } {
 interface Props {
   series: PriceSeriesPoint[];
   pickDate: string;
+  entryPrice: number | null;
 }
 
-export function PickChart({ series, pickDate }: Props) {
+export function PickChart({ series, pickDate, entryPrice }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const entryLineRef = useRef<HTMLDivElement>(null);
-  const entryIndex = findEntryIndex(series, pickDate);
-  const result = computePickReturn(series, pickDate);
+  const result = computePickReturn(series, entryPrice);
 
   useEffect(() => {
     const container = containerRef.current;
     const entryLineEl = entryLineRef.current;
-    if (!container || !entryLineEl || series.length < 2 || !result) return;
+    if (!container || !entryLineEl || series.length < 2 || !result || entryPrice == null) return;
 
     const dark = prefersDark();
     const chart = createChart(container, {
@@ -67,9 +67,10 @@ export function PickChart({ series, pickDate }: Props) {
       priceLineVisible: false,
     });
 
-    areaSeries.setData(series.map(point => ({ time: point.time as UTCTimestamp, value: point.close })));
+    const displaySeries = withEntryPoint(series, pickDate, entryPrice);
+    areaSeries.setData(displaySeries.map(point => ({ time: point.time as UTCTimestamp, value: point.close })));
 
-    const entryTime = series[entryIndex].time as UTCTimestamp;
+    const entryTime = marketCloseUnixSeconds(pickDate) as UTCTimestamp;
 
     const positionEntryLine = () => {
       const x = chart.timeScale().timeToCoordinate(entryTime);
@@ -94,7 +95,7 @@ export function PickChart({ series, pickDate }: Props) {
       resizeObserver.disconnect();
       chart.remove();
     };
-  }, [series, entryIndex, result]);
+  }, [series, pickDate, entryPrice, result]);
 
   if (!result) {
     return <p className="chart-pending">Chart pending — check back after the next trading day.</p>;

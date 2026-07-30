@@ -31,7 +31,7 @@ export function computeMetrics(runs: Run[]): AggregateMetrics {
   for (const run of runs) {
     for (const pick of run.picks) {
       totalPicks++;
-      const result = computePickReturn(pick.pick_price_series?.series ?? [], run.run_date);
+      const result = computePickReturn(pick.pick_price_series?.series ?? [], pick.entry_price);
       if (!result) continue;
 
       if (result.trend === 'up') wins++;

@@ -31,7 +31,7 @@ function App() {
   useEffect(() => {
     const fetchRuns = supabase
       .from('runs')
-      .select('id, run_date, status, total_cost_usd, created_at, completed_at, picks(id, run_id, ticker, reasoning, created_at, pick_price_series(series))')
+      .select('id, run_date, status, total_cost_usd, created_at, completed_at, picks(id, run_id, ticker, reasoning, entry_price, created_at, pick_price_series(series))')
       .order('run_date', { ascending: false });
 
     // Local/fast connections can resolve this in well under one pulse cycle —

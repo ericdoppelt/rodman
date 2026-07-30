@@ -71,7 +71,8 @@ async function main() {
     } else {
       picks.forEach(pick => console.log(`PICK: ${pick.ticker} — ${pick.reasoning}`));
     }
-    await recordPicks(supabase, runId, picks);
+    const entryPrices = Object.fromEntries(research.map(r => [r.stockChange.ticker, r.stockChange.close]));
+    await recordPicks(supabase, runId, picks, entryPrices);
 
     const totalCost = getTotalCost();
     console.log(`Total cost: $${totalCost.toFixed(4)}`);
