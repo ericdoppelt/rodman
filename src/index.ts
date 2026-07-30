@@ -17,7 +17,7 @@ const client = new Anthropic({
 });
 
 // Stock-selection parameters — logged per run (runs.params) for traceability across changes.
-const DIPS_LIMIT = 2;
+const DIPS_LIMIT = 10;
 const MIN_DOLLAR_VOLUME = 10_000_000;
 const MIN_MARKET_CAP = 100_000_000;
 

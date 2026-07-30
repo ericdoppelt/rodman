@@ -3,13 +3,14 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { type StockPick, type StockResearch, stockPickSchema, MAX_PICKS } from './schemas.js';
 import { trackUsage, calculateCallCost } from './usageTracker.js';
 import { recordLlmCall, type RunRecordContext } from './db/llmCallStore.js';
+import { parseWithRetry } from './parseWithRetry.js';
 
-const MODEL = 'claude-haiku-4-5-20251001';
-const MAX_TOKENS = 8096;
+export const MODEL = 'claude-opus-5';
+export const MAX_TOKENS = 8096;
 const TOOLS: Anthropic.Messages.WebSearchTool20250305[] = [];
 const TIMEOUT = 180_000;
 
-const JUDGE_SYSTEM_PROMPT = `You are a decisive senior investment analyst tasked with identifying the best buying opportunities from a set of stocks that dropped significantly in a single day.
+export const JUDGE_SYSTEM_PROMPT = `You are a decisive senior investment analyst tasked with identifying the best buying opportunities from a set of stocks that dropped significantly in a single day.
 
 You will be given bull and bear cases for each stock. Your job is to evaluate the arguments and recommend at most ${MAX_PICKS} stock(s) to buy.
 
@@ -40,7 +41,7 @@ export async function pickStock(client: Anthropic, stockResearch: StockResearch[
 
     const userPrompt = _getUserPrompt(stockResearch, formattedDate);
     const startTime = performance.now();
-    const response = await client.messages.parse({
+    const { parsedOutput } = await parseWithRetry(client, {
         model: MODEL,
         max_tokens: MAX_TOKENS,
         system: JUDGE_SYSTEM_PROMPT,
@@ -54,33 +55,31 @@ export async function pickStock(client: Anthropic, stockResearch: StockResearch[
         }]
     }, {
         timeout: TIMEOUT
+    }, async attemptResponse => {
+        trackUsage(MODEL, attemptResponse.usage);
+        if (record) {
+            await recordLlmCall(record.supabase, {
+                runId: record.runId,
+                callType: 'judge',
+                model: MODEL,
+                systemPrompt: JUDGE_SYSTEM_PROMPT,
+                userPrompt,
+                rawResponse: attemptResponse,
+                usage: attemptResponse.usage,
+                costUsd: calculateCallCost(MODEL, attemptResponse.usage),
+                latencyMs: Math.round(performance.now() - startTime),
+            });
+        }
     }).catch(error => {
         console.error(`Failed to judge stock research for date ${date}`, error);
         throw error;
     });
-    const latencyMs = Math.round(performance.now() - startTime);
 
-    trackUsage(MODEL, response.usage);
-
-    if (record) {
-        await recordLlmCall(record.supabase, {
-            runId: record.runId,
-            callType: 'judge',
-            model: MODEL,
-            systemPrompt: JUDGE_SYSTEM_PROMPT,
-            userPrompt,
-            rawResponse: response,
-            usage: response.usage,
-            costUsd: calculateCallCost(MODEL, response.usage),
-            latencyMs,
-        });
+    if (!parsedOutput) {
+        throw new Error(`No parsed output from judge for date ${formattedDate}`);
     }
 
-    if (!response.parsed_output) {
-        throw new Error(`No parsed output from judge for date ${formattedDate} (stop_reason: ${response.stop_reason})`);
-    }
-
-    return response.parsed_output;
+    return parsedOutput;
 }
 
 

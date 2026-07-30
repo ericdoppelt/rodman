@@ -7,9 +7,12 @@ interface ModelRates {
   cacheRead: number;
 }
 
-// $ per million tokens
+// $ per million tokens. Sonnet 5 uses standard (post-intro) pricing rather than the $2/$10
+// promo through 2026-08-31, so this stays correct after the promo ends without needing an update.
 const PRICING: Record<string, ModelRates> = {
   'claude-haiku-4-5-20251001': { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
+  'claude-sonnet-5': { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
+  'claude-opus-5': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
 };
 
 const usageRecords: { model: string; usage: Anthropic.Usage }[] = [];

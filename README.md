@@ -25,7 +25,7 @@ Find the top 10 stocks. This is a fixed, sequential process:
 3. Return top 10 candidates
 4. Fetch global market context (macro conditions, sector trends) as shared context for all stocks
 
-Currently run at `DIPS_LIMIT = 2` in `src/index.ts` (scaled down from the target of 10, mainly to keep per-run Claude/API cost down during early testing) — bump it back up once the pipeline's accuracy is validated via backtesting.
+Runs at `DIPS_LIMIT = 10` in `src/index.ts`, the target scale — validated via backtesting (see `BACKLOG.md`) after initially running at 2 during early testing to keep per-run Claude/API cost down.
 
 **Phase 2 — Agentic (Per stock, runs in parallel)**
 For each candidate stock, two Claude calls run concurrently, each with Anthropic's built-in `web_search` tool (capped at one use per call) to decide for itself what to search for and pull in live information:
