@@ -4,6 +4,7 @@ import { type StockChange, type Stance, stockAnalysisSchema, type StockAnalysis,
 import { trackUsage, calculateCallCost } from './usageTracker.js';
 import { recordLlmCall, type RunRecordContext } from './db/llmCallStore.js';
 import { recordRejectedCandidate } from './db/runStore.js';
+import { parseWithRetry } from './parseWithRetry.js';
 
 export const BULL_SYSTEM_PROMPT = `You are a balanced analyst tasked with making the strongest possible bull case for why a stock that dropped significantly represents a buying opportunity.
 
@@ -77,7 +78,8 @@ async function _analyzeStockChangeWithStance(client: Anthropic, stockChange: Sto
     const userPrompt = _getUserPrompt(stockChange, marketContext, date);
 
     const startTime = performance.now();
-    const response = await client.messages.parse(
+    const { parsedOutput } = await parseWithRetry(
+        client,
         {
             model: MODEL,
             max_tokens: MAX_TOKENS,
@@ -93,34 +95,33 @@ async function _analyzeStockChangeWithStance(client: Anthropic, stockChange: Sto
         },
         {
             timeout: TIMEOUT
-        }).catch(error => {
-            console.error(`Error analyzing stock ${stockChange.ticker} for the ${stance} stance`, error);
-            throw error;
-        });
-    const latencyMs = Math.round(performance.now() - startTime);
-
-    trackUsage(MODEL, response.usage);
-
-    if (record) {
-        await recordLlmCall(record.supabase, {
-            runId: record.runId,
-            callType: stance,
-            ticker: stockChange.ticker,
-            model: MODEL,
-            systemPrompt,
-            userPrompt,
-            rawResponse: response,
-            usage: response.usage,
-            costUsd: calculateCallCost(MODEL, response.usage),
-            latencyMs,
-        });
+        },
+        async attemptResponse => {
+            trackUsage(MODEL, attemptResponse.usage);
+            if (record) {
+                await recordLlmCall(record.supabase, {
+                    runId: record.runId,
+                    callType: stance,
+                    ticker: stockChange.ticker,
+                    model: MODEL,
+                    systemPrompt,
+                    userPrompt,
+                    rawResponse: attemptResponse,
+                    usage: attemptResponse.usage,
+                    costUsd: calculateCallCost(MODEL, attemptResponse.usage),
+                    latencyMs: Math.round(performance.now() - startTime),
+                });
+            }
+        },
+    ).catch(error => {
+        console.error(`Error analyzing stock ${stockChange.ticker} for the ${stance} stance`, error);
+        throw error;
+    });
+    if (!parsedOutput) {
+        throw new Error(`No parsed output for ${stockChange.ticker} and ${stance} stance`);
     }
 
-    if (!response.parsed_output) {
-        throw new Error(`No parsed output for ${stockChange.ticker} and ${stance} stance (stop_reason: ${response.stop_reason})`);
-    }
-
-    return response.parsed_output;
+    return parsedOutput;
 }
 
 export async function researchStockChanges(client: Anthropic, stockChanges: StockChange[], marketContext: string, date: Date, record?: RunRecordContext): Promise<{ research: StockResearch[]; rejected: RejectedCandidate[] }> {

@@ -88,28 +88,39 @@ function _orderStockDipsDescending(stockChanges: StockChange[]): StockChange[] {
  * @param limit is the maximum number of stocks returned.
  * @param minMarketCap is the minimum market cap needed to be eligible; when set, dips are checked one at a time (in order
  * of largest drop first, rate-limited between calls) until `limit` qualifying stocks are found.
+ * @param marketCapLookup overrides how market cap is looked up per ticker (defaults to the live, rate-limited
+ * Polygon call). The backtest passes a synchronous static-snapshot lookup instead, since Polygon's endpoint only
+ * ever returns today's market cap regardless of the date requested anyway — see staticMarketCap.ts.
  * @returns `qualifying` StockChange[] with the largest drops that meet the dollar volume and market cap criteria,
- * plus `rejected` candidates from the market-cap scan (and why each was excluded) for traceability.
+ * `rejected` candidates from the market-cap scan (and why each was excluded) for traceability, and `allResults`
+ * (every ticker's raw OHLCV for the day, unfiltered) so callers can derive other same-day facts — e.g. the
+ * backtest's market-context snapshot — without an extra Polygon call.
  */
-export async function getLargestStockDips(date: Date, limit: number, minDollarVolume?: number, minMarketCap?: number): Promise<{ qualifying: StockChange[]; rejected: RejectedCandidate[] }> {
+export async function getLargestStockDips(
+  date: Date,
+  limit: number,
+  minDollarVolume?: number,
+  minMarketCap?: number,
+  marketCapLookup: (ticker: string) => Promise<number | undefined> | number | undefined = _fetchMarketCap,
+): Promise<{ qualifying: StockChange[]; rejected: RejectedCandidate[]; allResults: StockResult[] }> {
   const stockResults = await _queryStockDataForDate(date);
   if (stockResults.length === 0) {
     console.warn('No stock results for date', date.toISOString().slice(0, 10), '(e.g. weekend/holiday or no data)');
-    return { qualifying: [], rejected: [] };
+    return { qualifying: [], rejected: [], allResults: [] };
   }
   const filteredStockResults = (minDollarVolume !== undefined) ? stockResults.filter(sc => sc.v * sc.c >= minDollarVolume) : stockResults;
   const stockChanges = _createStockChanges(filteredStockResults);
   const orderedDips = _orderStockDipsDescending(stockChanges);
 
   if (minMarketCap === undefined) {
-    return { qualifying: orderedDips.slice(0, limit), rejected: [] };
+    return { qualifying: orderedDips.slice(0, limit), rejected: [], allResults: stockResults };
   }
 
   const qualifyingDips: StockChange[] = [];
   const rejected: RejectedCandidate[] = [];
   for (const stockChange of orderedDips) {
     if (qualifyingDips.length >= limit) break;
-    const marketCap = await _fetchMarketCap(stockChange.ticker);
+    const marketCap = await marketCapLookup(stockChange.ticker);
     if (marketCap !== undefined && marketCap >= minMarketCap) {
       qualifyingDips.push(stockChange);
     } else {
@@ -120,5 +131,5 @@ export async function getLargestStockDips(date: Date, limit: number, minDollarVo
       });
     }
   }
-  return { qualifying: qualifyingDips, rejected };
+  return { qualifying: qualifyingDips, rejected, allResults: stockResults };
 }

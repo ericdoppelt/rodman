@@ -36,13 +36,13 @@ function _getUserPrompt(stockResearch: StockResearch[], formattedDate: string | 
     return `Today is ${formattedDate}. Evaluate these stocks and decide which if any to recommend buying. Pick 0 stocks if you are not confident, and at most 1 if you are. \n\n${stockSummaries}`;
 }
 
-export async function pickStock(client: Anthropic, stockResearch: StockResearch[], date: Date, record?: RunRecordContext): Promise<StockPick> {
+export async function pickStock(client: Anthropic, stockResearch: StockResearch[], date: Date, record?: RunRecordContext, model: string = MODEL): Promise<StockPick> {
     const formattedDate = date.toISOString().split('T')[0];
 
     const userPrompt = _getUserPrompt(stockResearch, formattedDate);
     const startTime = performance.now();
     const { parsedOutput } = await parseWithRetry(client, {
-        model: MODEL,
+        model,
         max_tokens: MAX_TOKENS,
         system: JUDGE_SYSTEM_PROMPT,
         tools: TOOLS,
@@ -56,17 +56,17 @@ export async function pickStock(client: Anthropic, stockResearch: StockResearch[
     }, {
         timeout: TIMEOUT
     }, async attemptResponse => {
-        trackUsage(MODEL, attemptResponse.usage);
+        trackUsage(model, attemptResponse.usage);
         if (record) {
             await recordLlmCall(record.supabase, {
                 runId: record.runId,
                 callType: 'judge',
-                model: MODEL,
+                model,
                 systemPrompt: JUDGE_SYSTEM_PROMPT,
                 userPrompt,
                 rawResponse: attemptResponse,
                 usage: attemptResponse.usage,
-                costUsd: calculateCallCost(MODEL, attemptResponse.usage),
+                costUsd: calculateCallCost(model, attemptResponse.usage),
                 latencyMs: Math.round(performance.now() - startTime),
             });
         }

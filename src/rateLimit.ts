@@ -13,12 +13,22 @@ export function sleep(ms: number): Promise<void> {
 // skipped day immediately followed by the next day's dip scan — still stay spaced out.
 let _lastPolygonCallAt = 0;
 
-async function _waitForSlot(): Promise<void> {
-  const elapsed = Date.now() - _lastPolygonCallAt;
-  if (elapsed < POLYGON_CALL_DELAY_MS) {
-    await sleep(POLYGON_CALL_DELAY_MS - elapsed);
-  }
-  _lastPolygonCallAt = Date.now();
+// Concurrent callers chain onto this queue so slot checks always see the freshest
+// _lastPolygonCallAt instead of racing on a stale read — without this, several calls fired at
+// once (e.g. Promise.all across backtest candidates) could all pass the elapsed-time check
+// before any of them updates _lastPolygonCallAt, breaching the 12s spacing Polygon requires.
+let _queue: Promise<void> = Promise.resolve();
+
+function _waitForSlot(): Promise<void> {
+  const slot = _queue.then(async () => {
+    const elapsed = Date.now() - _lastPolygonCallAt;
+    if (elapsed < POLYGON_CALL_DELAY_MS) {
+      await sleep(POLYGON_CALL_DELAY_MS - elapsed);
+    }
+    _lastPolygonCallAt = Date.now();
+  });
+  _queue = slot;
+  return slot;
 }
 
 /**

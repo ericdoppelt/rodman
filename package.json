@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts",
     "backtest": "tsx src/backtest/runBacktest.ts",
     "score-forward-test": "tsx src/backtest/scoreForwardTest.ts",
+    "update-market-caps": "tsx scripts/updateMarketCapSnapshot.ts",
     "update-pick-price-series": "tsx src/updatePickPriceSeries.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

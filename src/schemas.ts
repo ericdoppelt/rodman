@@ -102,15 +102,25 @@ export const tickerRangeAggsResponseSchema = z.object({
   results: z.array(tickerAggResultSchema).optional().default([]),
 });
 
-export const polygonNewsItemSchema = z.object({
+// Generic news-item shape used throughout the backtest, regardless of provider (Tavily).
+// Field names (`published_utc`) kept from the original Polygon-backed implementation since
+// nothing about them is Polygon-specific and it avoids churn in every call site.
+export const newsItemSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   published_utc: z.string(),
   article_url: z.string().optional(),
 });
 
-export type PolygonNewsItem = z.infer<typeof polygonNewsItemSchema>;
+export type NewsItem = z.infer<typeof newsItemSchema>;
 
-export const polygonNewsResponseSchema = z.object({
-  results: z.array(polygonNewsItemSchema).optional().default([]),
+export const tavilySearchResultSchema = z.object({
+  title: z.string(),
+  content: z.string().optional(),
+  url: z.string().optional(),
+  published_date: z.string().optional(),
+});
+
+export const tavilySearchResponseSchema = z.object({
+  results: z.array(tavilySearchResultSchema).optional().default([]),
 });
