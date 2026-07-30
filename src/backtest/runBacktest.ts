@@ -4,7 +4,7 @@ import { getLargestStockDips } from '../fetchTopDips.js';
 import { pickStock } from '../judgeResearch.js';
 import { getTotalCost } from '../usageTracker.js';
 import { researchStockChangesBacktest } from './backtestStockAgents.js';
-import { getForwardReturns } from './forwardReturn.js';
+import { getForwardReturns, type ForwardReturn } from './forwardReturn.js';
 import { staticMarketCapLookup } from './staticMarketCap.js';
 import { getHistoricalMarketNews } from './fetchHistoricalMarketNews.js';
 import { getHistoricalNews } from './fetchHistoricalNews.js';
@@ -14,6 +14,16 @@ import { readDailyCache, writeDailyCache } from './dailyCache.js';
 import type { NewsItem, StockChange } from '../schemas.js';
 import { MODEL as PROD_BULL_BEAR_MODEL } from '../stockAgents.js';
 import { MODEL as PROD_JUDGE_MODEL } from '../judgeResearch.js';
+import {
+  DIPS_PER_DAY,
+  MARKET_NEWS_LIMIT,
+  MIN_DOLLAR_VOLUME,
+  MIN_MARKET_CAP,
+  HORIZONS,
+  PRIMARY_HORIZON,
+  END_DATE_BUFFER_DAYS,
+  LOOKBACK_WINDOW_DAYS,
+} from './backtestConfig.js';
 
 dotenv.config();
 
@@ -30,41 +40,6 @@ const JUDGE_MODEL = process.env.BACKTEST_JUDGE_MODEL || PROD_JUDGE_MODEL;
 
 // How many past days (that actually had a qualifying dip) to test.
 const TEST_TRADING_DAYS = 30;
-// Candidates per day. Bull/bear calls (2 per candidate) dominate run cost and time, so this is
-// the main lever on both — raised from 2 now that the market-cap scan and Polygon calls generally
-// are no longer the bottleneck (static snapshot + concurrent fetching, see staticMarketCap.ts and
-// backtestStockAgents.ts).
-const DIPS_PER_DAY = 4;
-// How many general market-news headlines to pull per test day for the market-context block.
-const MARKET_NEWS_LIMIT = 20;
-// MIN_DOLLAR_VOLUME matches production's filter (see getLargestStockDips call in src/index.ts).
-// MIN_MARKET_CAP is deliberately higher than production's $100M floor — testing whether the
-// judge's edge holds on larger companies specifically. This means the candidate universe here is
-// narrower than what the deployed pipeline actually sees; a result here doesn't say anything
-// about the small/micro-cap dips production still picks from. $10B was tried first but true
-// mega-caps rarely show up among the day's biggest percentage droppers, so the scan could exhaust
-// the day's candidates without finding any. $2B is still meaningfully "larger companies" while
-// staying common enough among daily droppers to find matches.
-const MIN_DOLLAR_VOLUME = 10_000_000;
-const MIN_MARKET_CAP = 2_000_000_000;
-// Holding periods to score a pick against, listed chronologically. Primary metric is
-// PRIMARY_HORIZON (5 days) — the bull/bear reasoning is anchored to a specific catalyst on a
-// specific day, and that catalyst's relevance to price fades fast, so "a week" is closer to what
-// the judge is actually reasoning about than "a month" (20 trading days), where unrelated news
-// has usually taken over as the main driver. 1-day is included to see whether the judge's edge is
-// even stronger right next to the catalyst — additional context only, not primary (changing
-// primary post-hoc based on which horizon looks best in a given run is exactly the p-hacking this
-// backtest is designed to avoid). All horizons are reported at no extra API cost, since
-// getForwardReturns covers every horizon from one Polygon call.
-const HORIZONS = [1, 5, 20];
-const PRIMARY_HORIZON = 5;
-// Most recent date considered, so the longest horizon's price history already exists.
-const END_DATE_BUFFER_DAYS = Math.max(...HORIZONS) + 10;
-// How far back candidate dates can be sampled from. A contiguous recent window is really one
-// market regime — every test day shares whatever conditions happened to hold that stretch.
-// Sampling randomly across a full year spreads days across different regimes (calm/volatile,
-// up/down markets), so a good (or bad) result is harder to explain away as "just a good month."
-const LOOKBACK_WINDOW_DAYS = 365;
 // Safety cap on sampling attempts in case too few days in the window have qualifying dips.
 const MAX_SAMPLE_ATTEMPTS = 300;
 // Fixed seed so the sampled dates (and thus the result) are reproducible across runs.
@@ -136,11 +111,20 @@ async function main() {
     let marketContextPromise: Promise<string>;
     let newsLookup: (ticker: string, date: Date) => Promise<NewsItem[]>;
     let finalizeCache: (() => void) | undefined;
+    // Forward returns are historical price data — fixed once the date has passed — so a cache hit
+    // (including one written by warmCache.ts) skips Polygon for them entirely, same as dips/news.
+    let forwardReturnsPromise: Promise<(Map<number, ForwardReturn> | undefined)[]>;
 
     if (cached) {
       dips = cached.dips;
       marketContextPromise = Promise.resolve(buildMarketContext(testDate, cached.allResults, cached.marketNews));
       newsLookup = async ticker => cached.perTickerNews[ticker] ?? [];
+      forwardReturnsPromise = cached.forwardReturns
+        ? Promise.resolve(dips.map(dip => {
+            const perTicker = cached.forwardReturns![dip.ticker];
+            return perTicker ? new Map(Object.entries(perTicker).map(([h, fr]) => [Number(h), fr])) : undefined;
+          }))
+        : Promise.all(dips.map(dip => getForwardReturns(dip.ticker, testDate, HORIZONS)));
     } else {
       const fetched = await getLargestStockDips(testDate, DIPS_PER_DAY, MIN_DOLLAR_VOLUME, MIN_MARKET_CAP, staticMarketCapLookup);
       dips = fetched.qualifying;
@@ -166,12 +150,20 @@ async function main() {
         return news;
       };
 
+      const forwardReturnsForCache: Record<string, Record<number, ForwardReturn>> = {};
+      forwardReturnsPromise = Promise.all(dips.map(async dip => {
+        const forward = await getForwardReturns(dip.ticker, testDate, HORIZONS);
+        if (forward) forwardReturnsForCache[dip.ticker] = Object.fromEntries(forward);
+        return forward;
+      }));
+
       finalizeCache = () => {
         writeDailyCache(dateKey, {
           dips,
           allResults: fetched.allResults,
           marketNews: marketNewsForCache,
           perTickerNews: perTickerNewsForCache,
+          forwardReturns: forwardReturnsForCache,
         });
       };
     }
@@ -181,12 +173,10 @@ async function main() {
       continue;
     }
 
-    const forwardReturnsPromise = Promise.all(dips.map(dip => getForwardReturns(dip.ticker, testDate, HORIZONS)));
-
     const research = await researchStockChangesBacktest(client, dips, marketContextPromise, testDate, newsLookup, BULL_BEAR_MODEL);
     const picks = await pickStock(client, research, testDate, undefined, JUDGE_MODEL);
     if (finalizeCache) {
-      await marketContextPromise; // ensure marketNewsForCache is populated before writing
+      await Promise.all([marketContextPromise, forwardReturnsPromise]); // ensure cache-fill side effects have populated before writing
       finalizeCache();
     }
     const pickTicker = picks[0]?.ticker;

@@ -7,9 +7,11 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "backtest": "tsx src/backtest/runBacktest.ts",
+    "warm-backtest-cache": "tsx src/backtest/warmCache.ts",
     "score-forward-test": "tsx src/backtest/scoreForwardTest.ts",
     "update-market-caps": "tsx scripts/updateMarketCapSnapshot.ts",
     "update-pick-price-series": "tsx src/updatePickPriceSeries.ts",
+    "backfill-entry-prices": "tsx scripts/backfillEntryPrices.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
