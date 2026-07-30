@@ -44,6 +44,15 @@ const TEST_TRADING_DAYS = 30;
 const MAX_SAMPLE_ATTEMPTS = 300;
 // Fixed seed so the sampled dates (and thus the result) are reproducible across runs.
 const RANDOM_SEED = 42;
+// How many days' worth of Claude research run concurrently. Each day fires up to
+// DIPS_PER_DAY*2 bull/bear calls at once (already concurrent within one day, see
+// backtestStockAgents.ts) plus one judge call, so this multiplies out fast — e.g. 4 days at
+// DIPS_PER_DAY=4 is up to 32 simultaneous bull/bear calls. There's no way to read your actual
+// Anthropic rate-limit tier from the API, so this defaults conservatively; the SDK's own default
+// retry-with-backoff (client.messages.create's built-in maxRetries) absorbs occasional 429s from
+// bursty overlap, but a sustained overshoot will still slow things down via retries rather than
+// speed them up. Raise via BACKTEST_CONCURRENCY once you know your tier's real headroom.
+const CONCURRENCY = Number(process.env.BACKTEST_CONCURRENCY) || 4;
 
 // Deterministic PRNG (mulberry32) — Math.random() isn't seedable, and reproducible sampling
 // means the exact test dates (and result) can be reported and re-verified, not just asserted.
@@ -73,6 +82,33 @@ interface DayResult {
   pickTicker: string | undefined;
 }
 
+// Raw inputs for one test date, gathered during the (still-sequential, Polygon-rate-limited on a
+// cache miss) sampling phase, deferred here so the Claude research/judge work below can run
+// several dates at once instead of one at a time.
+interface DayContext {
+  testDate: Date;
+  dateKey: string;
+  dips: StockChange[];
+  marketContextPromise: Promise<string>;
+  newsLookup: (ticker: string, date: Date) => Promise<NewsItem[]>;
+  finalizeCache: (() => void) | undefined;
+  forwardReturnsPromise: Promise<(Map<number, ForwardReturn> | undefined)[]>;
+}
+
+// Runs `worker` over `items` with at most `concurrency` in flight at once — a plain worker-pool
+// (no library) since the only real requirement is a hard cap, not scheduling fairness.
+async function _runWithConcurrency<T, R>(items: T[], concurrency: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  async function runNext(): Promise<void> {
+    for (let i = nextIndex++; i < items.length; i = nextIndex++) {
+      results[i] = await worker(items[i]!);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, runNext));
+  return results;
+}
+
 async function main() {
   if (!process.env.MASSIVE_API_KEY) throw new Error('MASSIVE_API_KEY is not set');
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set');
@@ -80,7 +116,6 @@ async function main() {
 
   console.log(`Models: bull/bear=${BULL_BEAR_MODEL}${BULL_BEAR_MODEL !== PROD_BULL_BEAR_MODEL ? ' (override, not production)' : ''}, judge=${JUDGE_MODEL}${JUDGE_MODEL !== PROD_JUDGE_MODEL ? ' (override, not production)' : ''}`);
 
-  const results: DayResult[] = [];
   const random = _createRandom(RANDOM_SEED);
 
   const earliestDate = new Date();
@@ -89,9 +124,12 @@ async function main() {
   latestDate.setDate(latestDate.getDate() - END_DATE_BUFFER_DAYS);
   const rangeMs = latestDate.getTime() - earliestDate.getTime();
 
+  // --- Phase 1: sample dates and gather raw inputs (sequential — a cache miss here is bound by
+  // Polygon's rate limit regardless of what we do downstream; see warmCache.ts to avoid misses). ---
+  const dayContexts: DayContext[] = [];
   const triedDates = new Set<string>();
   let sampleAttempts = 0;
-  while (results.length < TEST_TRADING_DAYS && sampleAttempts < MAX_SAMPLE_ATTEMPTS) {
+  while (dayContexts.length < TEST_TRADING_DAYS && sampleAttempts < MAX_SAMPLE_ATTEMPTS) {
     sampleAttempts++;
     const testDate = new Date(earliestDate.getTime() + Math.floor(random() * rangeMs));
     testDate.setHours(0, 0, 0, 0);
@@ -99,7 +137,7 @@ async function main() {
     if (triedDates.has(dateKey)) continue; // already sampled this exact date — draw again
     triedDates.add(dateKey);
 
-    console.log(`\n--- ${dateKey} (sample ${sampleAttempts}) ---`);
+    console.log(`--- ${dateKey} (sample ${sampleAttempts}) ---`);
 
     // Raw, model-independent inputs (candidates, index/sector data, news) are cached per date
     // after the first fetch — see dailyCache.ts. A cache hit skips Polygon/Tavily entirely, so
@@ -173,6 +211,16 @@ async function main() {
       continue;
     }
 
+    dayContexts.push({ testDate, dateKey, dips, marketContextPromise, newsLookup, finalizeCache, forwardReturnsPromise });
+  }
+
+  // --- Phase 2: research + judge each sampled date, up to CONCURRENCY at once. Independent of
+  // Phase 1 now that raw inputs are already resolved/in flight, so this is the part that actually
+  // benefits from parallelizing — see BACKTEST_CONCURRENCY above. ---
+  console.log(`\nScoring ${dayContexts.length} day(s), up to ${CONCURRENCY} concurrently...`);
+  const results = await _runWithConcurrency(dayContexts, CONCURRENCY, async ctx => {
+    const { testDate, dateKey, dips, marketContextPromise, newsLookup, finalizeCache, forwardReturnsPromise } = ctx;
+
     const research = await researchStockChangesBacktest(client, dips, marketContextPromise, testDate, newsLookup, BULL_BEAR_MODEL);
     const picks = await pickStock(client, research, testDate, undefined, JUDGE_MODEL);
     if (finalizeCache) {
@@ -187,14 +235,14 @@ async function main() {
       const returns = new Map<number, number>();
       for (const [horizon, fr] of forward ?? []) returns.set(horizon, fr.pctReturn);
       const summary = HORIZONS.map(h => `${h}d: ${returns.has(h) ? returns.get(h)!.toFixed(2) + '%' : 'unavailable'}`).join(', ');
-      console.log(`  ${dip.ticker}: dropped ${dip.percentageChange.toFixed(2)}%, forward returns — ${summary}`);
+      console.log(`[${dateKey}] ${dip.ticker}: dropped ${dip.percentageChange.toFixed(2)}%, forward returns — ${summary}`);
       return { ticker: dip.ticker, returns };
     });
 
-    console.log(pickTicker ? `  JUDGE PICK: ${pickTicker} — ${picks[0]?.reasoning}` : '  JUDGE PICK: none (no stock met the conviction bar)');
+    console.log(pickTicker ? `[${dateKey}] JUDGE PICK: ${pickTicker} — ${picks[0]?.reasoning}` : `[${dateKey}] JUDGE PICK: none (no stock met the conviction bar)`);
 
-    results.push({ date: testDate.toISOString().slice(0, 10), candidates, pickTicker });
-  }
+    return { date: dateKey, candidates, pickTicker };
+  });
 
   // --- Aggregate ---
   const daysWithPick = results.filter(r => r.pickTicker !== undefined).length;
