@@ -1,23 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#0d0f14"/>
-  <path
-    d="M8,38 L16,38 L26,28 L36,46 L46,14 L56,14"
-    fill="none"
-    stroke="url(#pulse-mark)"
-    stroke-width="6"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  />
   <defs>
-    <linearGradient id="pulse-mark" x1="8" y1="0" x2="56" y2="0" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#6b7280"/>
-      <stop offset="37.5%" stop-color="#6b7280"/>
-      <stop offset="37.5%" stop-color="#e66767"/>
-      <stop offset="58.3%" stop-color="#e66767"/>
-      <stop offset="58.3%" stop-color="#0ca30c"/>
-      <stop offset="79.2%" stop-color="#0ca30c"/>
-      <stop offset="79.2%" stop-color="#6b7280"/>
-      <stop offset="100%" stop-color="#6b7280"/>
-    </linearGradient>
+    <clipPath id="tile"><rect width="64" height="64" rx="14"/></clipPath>
   </defs>
+  <g clip-path="url(#tile)">
+    <rect width="64" height="64" fill="#0a0909"/>
+    <path d="M-19,-6 L58,70 M-3,-6 L74,70 M13,-6 L90,70 M29,-6 L106,70 M45,-6 L122,70" fill="none" stroke="#ce1141" stroke-width="4.8" stroke-linecap="round"/>
+    <path d="M-19,70 L58,-6 M-3,70 L74,-6 M13,70 L90,-6 M29,70 L106,-6 M45,70 L122,-6" fill="none" stroke="#2fd383" stroke-width="4.8" stroke-linecap="round"/>
+  </g>
 </svg>
