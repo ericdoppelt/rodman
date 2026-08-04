@@ -4,7 +4,7 @@ import { getForwardReturns, type ForwardReturn } from './forwardReturn.js';
 import { staticMarketCapLookup } from './staticMarketCap.js';
 import { getHistoricalMarketNews } from './fetchHistoricalMarketNews.js';
 import { getHistoricalNews } from './fetchHistoricalNews.js';
-import { readDailyCache, writeDailyCache } from './dailyCache.js';
+import { readDailyCache, writeDailyCache, hasCompleteForwardReturns } from './dailyCache.js';
 import type { NewsItem } from '../schemas.js';
 import {
   DIPS_PER_DAY,
@@ -45,6 +45,7 @@ async function main() {
   console.log(`Warming cache for ${totalDays} calendar days: ${earliestDate.toISOString().slice(0, 10)} to ${latestDate.toISOString().slice(0, 10)}`);
 
   let warmed = 0;
+  let backfilled = 0;
   let skipped = 0;
   let empty = 0;
   const startedAt = Date.now();
@@ -53,8 +54,23 @@ async function main() {
     const date = new Date(earliestDate.getTime() + i * 24 * 60 * 60 * 1000);
     const dateKey = date.toISOString().slice(0, 10);
 
-    if (readDailyCache(dateKey)) {
+    const existing = readDailyCache(dateKey);
+    if (existing && hasCompleteForwardReturns(existing, HORIZONS)) {
       skipped++;
+      continue;
+    }
+
+    if (existing) {
+      // Raw dips/news are still valid (model-independent) — only the forward returns are stale,
+      // because a horizon was added to HORIZONS since this date was cached. Re-fetch just those.
+      const forwardReturns: Record<string, Record<number, ForwardReturn>> = {};
+      await Promise.all(existing.dips.map(async dip => {
+        const forward = await getForwardReturns(dip.ticker, date, HORIZONS);
+        if (forward) forwardReturns[dip.ticker] = Object.fromEntries(forward);
+      }));
+      writeDailyCache(dateKey, { ...existing, forwardReturns });
+      backfilled++;
+      console.log(`[${i + 1}/${totalDays}] ${dateKey}: backfilled forward returns for horizons ${HORIZONS.join(',')}`);
       continue;
     }
 
@@ -88,7 +104,7 @@ async function main() {
   }
 
   const elapsedMin = ((Date.now() - startedAt) / 60_000).toFixed(1);
-  console.log(`\nDone in ${elapsedMin} min. Warmed: ${warmed}, already cached (skipped): ${skipped}, empty (weekend/holiday/no dips): ${empty}.`);
+  console.log(`\nDone in ${elapsedMin} min. Warmed: ${warmed}, backfilled (forward returns only): ${backfilled}, already cached (skipped): ${skipped}, empty (weekend/holiday/no dips): ${empty}.`);
 }
 
 main().catch(console.error);

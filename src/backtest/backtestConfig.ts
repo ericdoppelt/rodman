@@ -22,18 +22,26 @@ export const MIN_MARKET_CAP = 2_000_000_000;
 // Holding periods to score a pick against, listed chronologically. Primary metric is
 // PRIMARY_HORIZON (5 days) — the bull/bear reasoning is anchored to a specific catalyst on a
 // specific day, and that catalyst's relevance to price fades fast, so "a week" is closer to what
-// the judge is actually reasoning about than "a month" (20 trading days), where unrelated news
-// has usually taken over as the main driver. 1-day is included to see whether the judge's edge is
+// the judge is actually reasoning about than "a month" or longer, where unrelated news has
+// usually taken over as the main driver. 1-day is included to see whether the judge's edge is
 // even stronger right next to the catalyst — additional context only, not primary (changing
 // primary post-hoc based on which horizon looks best in a given run is exactly the p-hacking this
-// backtest is designed to avoid). All horizons are reported at no extra API cost, since
-// getForwardReturns covers every horizon from one Polygon call.
-export const HORIZONS = [1, 5, 20];
+// backtest is designed to avoid). 21/42/63/... are monthly multiples (~21 trading days/month) out
+// to 12 months, added to see how far the judge's edge persists/decays. All horizons are reported
+// at no extra API cost, since getForwardReturns covers every horizon from one Polygon call — but
+// the longest horizon here does push END_DATE_BUFFER_DAYS out, shrinking the testable window (see
+// below), and any date already cached under a shorter HORIZONS list needs its forward returns
+// backfilled (see dailyCache.ts's hasCompleteForwardReturns / warmCache.ts).
+export const HORIZONS = [1, 5, 21, 42, 63, 84, 105, 126, 147, 168, 189, 210, 231, 252];
 export const PRIMARY_HORIZON = 5;
-// Most recent date considered, so the longest horizon's price history already exists.
-export const END_DATE_BUFFER_DAYS = Math.max(...HORIZONS) + 10;
+// Most recent date considered, so the longest horizon's price history already exists. HORIZONS
+// counts *trading* days, but this buffer is in *calendar* days, so a flat +10 badly undercounts
+// weekends/holidays once horizons get large (252 trading days is ~353 calendar days, not 262) —
+// use the same trading-day-to-calendar-day overshoot factor forwardReturn.ts uses for its own
+// Polygon range query, plus the same safety margin.
+export const END_DATE_BUFFER_DAYS = Math.ceil(Math.max(...HORIZONS) * 1.6) + 10;
 // How far back candidate dates can be sampled from. A contiguous recent window is really one
 // market regime — every test day shares whatever conditions happened to hold that stretch.
 // Sampling randomly across a full year spreads days across different regimes (calm/volatile,
 // up/down markets), so a good (or bad) result is harder to explain away as "just a good month."
-export const LOOKBACK_WINDOW_DAYS = 365;
+export const LOOKBACK_WINDOW_DAYS = 560;

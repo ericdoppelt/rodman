@@ -2,6 +2,7 @@ import { appendFileSync, statSync } from 'fs';
 import { getGitSha } from '../gitSha.js';
 import { BULL_SYSTEM_PROMPT, BEAR_SYSTEM_PROMPT, MODEL as PROD_BULL_BEAR_MODEL, MAX_TOKENS as RESEARCH_MAX_TOKENS } from '../stockAgents.js';
 import { JUDGE_SYSTEM_PROMPT, MODEL as PROD_JUDGE_MODEL, MAX_TOKENS as JUDGE_MAX_TOKENS } from '../judgeResearch.js';
+import { ELIMINATION_JUDGE_SYSTEM_PROMPT } from './eliminationJudge.js';
 import { MAX_PICKS } from '../schemas.js';
 
 // One JSON record per `pnpm backtest` run, appended (never overwritten) so results are
@@ -33,6 +34,10 @@ export interface BacktestRunParams {
   marketNewsLimit: number;
   bullBearModel: string;
   judgeModel: string;
+  // 'single' = production's judge (at most MAX_PICKS=1 pick/day). 'eliminate' = the backtest-only
+  // alternate that defaults to keeping every candidate, excluding only a fundamentally flawed one
+  // — see eliminationJudge.ts. Never affects production, which always runs 'single'.
+  strategy: 'single' | 'eliminate';
 }
 
 export interface BacktestRunResult {
@@ -76,7 +81,7 @@ export function logBacktestRun(params: BacktestRunParams, result: BacktestRunRes
     gitSha: getGitSha(),
     parameters: {
       ...params,
-      maxPicksPerDay: MAX_PICKS,
+      maxPicksPerDay: params.strategy === 'eliminate' ? params.dipsPerDay : MAX_PICKS,
       marketCapSnapshotVintage: _marketCapSnapshotVintage(),
       bullBear: {
         model: params.bullBearModel,
@@ -87,7 +92,7 @@ export function logBacktestRun(params: BacktestRunParams, result: BacktestRunRes
       judge: {
         model: params.judgeModel,
         maxTokens: JUDGE_MAX_TOKENS,
-        systemPrompt: JUDGE_SYSTEM_PROMPT,
+        systemPrompt: params.strategy === 'eliminate' ? ELIMINATION_JUDGE_SYSTEM_PROMPT : JUDGE_SYSTEM_PROMPT,
       },
     },
     limitations,

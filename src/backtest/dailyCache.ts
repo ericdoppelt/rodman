@@ -38,3 +38,18 @@ export function writeDailyCache(dateKey: string, entry: DailyCacheEntry): void {
   mkdirSync(CACHE_DIR, { recursive: true });
   writeFileSync(_pathFor(dateKey), JSON.stringify(entry, null, 2));
 }
+
+// True if every dip candidate's cached forward returns already cover every horizon currently
+// configured. False when a horizon was added to HORIZONS after this date was cached — e.g. an
+// entry cached back when HORIZONS topped out at 20 days has no way to answer a 252-day horizon,
+// since getForwardReturns' single Polygon call only fetched bars out to the widest horizon
+// requested *at fetch time*. Callers use this to backfill just the missing forward returns
+// instead of re-fetching dips/news that haven't changed.
+export function hasCompleteForwardReturns(entry: DailyCacheEntry, horizons: number[]): boolean {
+  if (!entry.forwardReturns) return entry.dips.length === 0;
+  const forwardReturns = entry.forwardReturns;
+  return entry.dips.every(dip => {
+    const fr = forwardReturns[dip.ticker];
+    return fr !== undefined && horizons.every(h => h in fr);
+  });
+}

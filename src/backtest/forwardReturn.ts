@@ -56,12 +56,16 @@ export async function getForwardReturns(ticker: string, fromDate: Date, tradingD
 
   const returns = new Map<number, ForwardReturn>();
   for (const horizon of tradingDaysAheadList) {
-    const toIndex = Math.min(horizon, bars.length - 1);
-    const toBar = bars[toIndex];
-    if (!toBar || toIndex === 0) {
+    // Only accept a bar that's genuinely `horizon` trading days out — Math.min-ing down to the
+    // last available bar would silently label a shorter, closer-to-today return as this horizon,
+    // corrupting it rather than just omitting it. Omitting is the safe failure mode: the caller
+    // (hasCompleteForwardReturns) treats a missing horizon key as "needs backfill," a wrong value
+    // just looks like data.
+    if (bars.length - 1 < horizon) {
       console.warn(`Not enough trading-day history for ${ticker} to reach the ${horizon}-day horizon yet`);
       continue;
     }
+    const toBar = bars[horizon]!;
     returns.set(horizon, {
       fromClose: fromBar.c,
       toClose: toBar.c,
