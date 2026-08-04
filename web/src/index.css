@@ -477,6 +477,7 @@ main {
    recovery), settles back down, then holds flat again before repeating. */
 .pulse-bar--hero {
   width: 6px;
+  height: 40%; /* resting height — also what's shown if the animation is ever disabled */
   opacity: 1;
   animation: pulse-hero-bar 1.9s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
 }
@@ -526,6 +527,16 @@ main {
   }
 }
 
+@keyframes pulse-fade {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
@@ -561,8 +572,17 @@ main {
     transform: none !important;
   }
 
+  /* Height/color/shadow motion is what Reduce Motion is meant to suppress, but a fully static
+     loader reads as broken rather than "loading" (also: pulse-bar--hero has no static height of
+     its own, so without an animation supplying one it'd collapse to nothing). Keep every bar at
+     its resting height/color and swap in an opacity-only pulse, which reduced-motion guidance
+     generally treats as safe. */
   .pulse-bar {
-    animation: none !important;
+    animation: pulse-fade 1.6s ease-in-out infinite !important;
+  }
+
+  .pulse-bar--hero {
+    box-shadow: none !important;
   }
 
   .flow-candidate,
