@@ -442,6 +442,25 @@ main {
   height: 32px;
 }
 
+/* Only rendered when prefers-reduced-motion is on — an explicit, user-initiated way to preview the
+   animation without touching the OS-level setting (see .force-motion in the reduced-motion query
+   below). Never shown to someone who hasn't opted in already. */
+.pulse-motion-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.pulse-motion-toggle:hover {
+  color: var(--ink-secondary);
+}
+
 /* Every bar runs the same dip/recover story (down = red, up = green, settle
    = grey) — a staggered animation-delay per bar, left to right, makes it
    read as one wave sweeping across rather than five bars blinking in place. */
@@ -538,13 +557,15 @@ main {
     transform: none !important;
   }
 
-  /* What Reduce Motion guidance actually warns against is perpetual/looping motion, not a bounded
-     one-shot animation — so play the exact same left-to-right wave once (each bar still respects
-     its stagger via animation-delay, set outside this query) and hold the final frame instead of
-     cutting the animation entirely, which would just collapse every bar to its resting height. */
+  /* Default to no motion at all — the standard reading of Reduce Motion, and what this app did
+     originally. .force-motion (below) is the explicit, user-initiated escape hatch for someone who
+     wants to preview the animation anyway without changing their OS-level setting. */
   .pulse-bar {
-    animation-iteration-count: 1 !important;
-    animation-fill-mode: forwards !important;
+    animation: none !important;
+  }
+
+  .force-motion .pulse-bar {
+    animation: pulse-wave 1.9s cubic-bezier(0.34, 1.56, 0.64, 1) infinite !important;
   }
 
   .flow-candidate,
