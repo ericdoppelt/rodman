@@ -445,7 +445,7 @@ main {
 .pulse-bar {
   width: 5px;
   border-radius: 2.5px;
-  background: var(--ink-muted);
+  background-color: var(--ink-muted);
   opacity: 0.55;
 }
 
@@ -496,32 +496,32 @@ main {
 @keyframes pulse-hero-bar {
   0% {
     height: 40%;
-    background: var(--ink-muted);
+    background-color: var(--ink-muted);
     box-shadow: none;
   }
   38% {
     height: 40%;
-    background: var(--ink-muted);
+    background-color: var(--ink-muted);
     box-shadow: none;
   }
   52% {
     height: 16%;
-    background: var(--status-critical);
+    background-color: var(--status-critical);
     box-shadow: 0 0 10px -2px var(--status-critical);
   }
   68% {
     height: 92%;
-    background: var(--status-good);
+    background-color: var(--status-good);
     box-shadow: 0 0 14px -2px var(--status-good);
   }
   82% {
     height: 55%;
-    background: var(--status-good);
+    background-color: var(--status-good);
     box-shadow: 0 0 10px -3px var(--status-good);
   }
   100% {
     height: 40%;
-    background: var(--ink-muted);
+    background-color: var(--ink-muted);
     box-shadow: none;
   }
 }
