@@ -537,6 +537,22 @@ main {
   }
 }
 
+@keyframes pulse-hero-color {
+  0%,
+  30% {
+    background-color: var(--ink-muted);
+  }
+  50% {
+    background-color: var(--status-critical);
+  }
+  75% {
+    background-color: var(--status-good);
+  }
+  100% {
+    background-color: var(--ink-muted);
+  }
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
@@ -581,7 +597,13 @@ main {
     animation: pulse-fade 1.6s ease-in-out infinite !important;
   }
 
+  /* Color has no vestibular-trigger concerns the way size/position motion does, so the hero still
+     gets its red-dip/green-recovery story — layered on top of the shared opacity pulse above, just
+     without the height change or box-shadow glow. */
   .pulse-bar--hero {
+    animation:
+      pulse-fade 1.6s ease-in-out infinite !important,
+      pulse-hero-color 2.4s ease-in-out infinite !important;
     box-shadow: none !important;
   }
 
