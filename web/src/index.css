@@ -861,7 +861,8 @@ main {
 }
 
 .flow-case p.flow-meta {
-  margin: 0.75rem 0 0;
+  margin: 0;
+  padding-top: 0.75rem;
   color: var(--ink-muted);
 }
 
