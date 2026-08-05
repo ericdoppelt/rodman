@@ -67,6 +67,11 @@ export function RunFlowDetail({ runId }: Props) {
         <h2>Market context</h2>
         <div className="flow-card">
           <p className="flow-context-text">{marketContextCall ? parseMarketContext(marketContextCall) : 'Not recorded for this run.'}</p>
+          {marketContextCall && (
+            <p className="flow-meta">
+              {marketContextCall.model} · {(marketContextCall.latency_ms / 1000).toFixed(1)}s · ${marketContextCall.cost_usd.toFixed(4)}
+            </p>
+          )}
         </div>
       </section>
 
@@ -121,6 +126,11 @@ export function RunFlowDetail({ runId }: Props) {
                       ) : (
                         <p className="flow-case-missing">Not recorded.</p>
                       )}
+                      {bull && (
+                        <p className="flow-meta">
+                          {bull.model} · {(bull.latency_ms / 1000).toFixed(1)}s · ${bull.cost_usd.toFixed(4)}
+                        </p>
+                      )}
                     </div>
                     <div className="flow-case flow-case--bear">
                       <div className="flow-case-head">
@@ -138,6 +148,11 @@ export function RunFlowDetail({ runId }: Props) {
                         </>
                       ) : (
                         <p className="flow-case-missing">Not recorded.</p>
+                      )}
+                      {bear && (
+                        <p className="flow-meta">
+                          {bear.model} · {(bear.latency_ms / 1000).toFixed(1)}s · ${bear.cost_usd.toFixed(4)}
+                        </p>
                       )}
                     </div>
                   </div>
