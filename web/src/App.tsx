@@ -94,7 +94,7 @@ function App() {
                 value={metrics.winRate}
                 format={n => `${n.toFixed(0)}%`}
                 fallback="n/a"
-                sublabel={metrics.winRate === null ? 'no decided picks yet' : `${metrics.wins}W – ${metrics.losses}L`}
+                sublabel={metrics.winRate === null ? 'no decided picks yet' : `${metrics.wins}W – ${metrics.losses}L – ${metrics.flats}T`}
                 tone={metrics.winRate === null ? 'neutral' : metrics.winRate > 50 ? 'up' : metrics.winRate < 50 ? 'down' : 'neutral'}
               />
               <StatTile
