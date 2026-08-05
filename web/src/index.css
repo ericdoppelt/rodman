@@ -858,6 +858,11 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+.flow-case p.flow-meta {
+  margin: 0.75rem 0 0;
+  color: var(--ink-muted);
+}
+
 @media (max-width: 640px) {
   .flow-cases {
     grid-template-columns: 1fr;
