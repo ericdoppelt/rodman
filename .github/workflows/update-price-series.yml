@@ -1,13 +1,13 @@
-name: Update pick price series
+name: Update pick price series and reconcile trades
 
 on:
   schedule:
-    # Every 15 min, 13:00-21:30 UTC (~9am-5:30pm ET), Mon-Fri — covers premarket through
-    # after-hours around a normal trading session, matching the 15-min bar granularity fetched
-    # below (polling faster than the bar size just refetches the same in-progress bar). At
-    # today's pick volume (1/weekday, refetching full history each run) this is well within
-    # Alpaca's free-tier 200-calls/min limit; see BACKLOG.md for the incremental-fetch work
-    # needed before pushing cadence much higher.
+    # GitHub's native schedule trigger is best-effort and can silently drop runs under load
+    # (confirmed in GitHub's own docs, not just observed here) — kept here only as a bonus
+    # fallback, not the real mechanism, so there's no reason to fuss over its exact minute offset.
+    # The actual 15-min cadence is driven by an external pinger (cron-job.org, free) calling this
+    # workflow's `workflow_dispatch` on schedule instead, since that's the only way to get a
+    # reliable 15-min guarantee. See BACKLOG.md and docs/decisions/0014.
     - cron: '0,15,30,45 13-21 * * 1-5'
   workflow_dispatch: {}
 
@@ -27,6 +27,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm update-pick-price-series
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      # Folded in here (rather than its own single-shot cron) so a dropped trigger self-heals —
+      # the next firing 15 min later just catches up, instead of silently reconciling zero times
+      # that day. reconcileTrades.ts itself is a fast no-op whenever there's nothing pending, so
+      # running it this often costs nothing extra beyond the request itself.
+      - run: pnpm reconcile-trades
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
