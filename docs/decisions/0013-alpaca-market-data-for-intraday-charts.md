@@ -38,7 +38,17 @@ ever need end-of-day or historical data, where Massive's free tier is already su
 ## Trade-off
 
 IEX is a single exchange (~2-3% of consolidated U.S. equity volume), not the full SIP tape, so
-bars can diverge slightly from the "real" composite price, especially for thinly-traded names.
-Acceptable for a display chart; would not be acceptable if this feed were ever used for execution
-decisions (paper-trade orders already go through Alpaca's own order-placement endpoint, which
-prices at fill time independent of this feed).
+bars can diverge from the "real" composite price. For liquid large-caps this is usually cents —
+Reg NMS trade-through rules keep venues tightly arbitraged in real time. But this pipeline's
+picks are small/mid-cap dip stocks, exactly the kind where IEX can see no trades at all for
+several minutes (observed directly: NRG's 15-min bars had gaps). On a volatile name, a stale
+IEX print several minutes old can diverge from the true current price by more than a few cents —
+this is a staleness effect, not a pricing-accuracy one. `entry_price` (still Massive/Polygon,
+SIP-consolidated) isn't affected; only the live chart line and its derived "current price" in
+win/loss metrics (`web/src/lib/metrics.ts`) carry this risk. Contrast: Yahoo/Google Finance take
+the opposite trade-off — SIP-consolidated (complete) but ~15-min delayed, vs. Alpaca/IEX here
+being real-time but partial. Decided not to add a UI disclaimer (chart is read directionally, not
+to the cent); this note exists so the caveat isn't lost. Acceptable for a display chart; would not
+be acceptable if this feed were ever used for execution decisions (paper-trade orders already go
+through Alpaca's own order-placement endpoint, which prices at fill time independent of this
+feed).
