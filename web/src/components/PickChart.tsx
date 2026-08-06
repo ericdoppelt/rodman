@@ -34,13 +34,12 @@ export function PickChart({ series, pickDate, entryPrice }: Props) {
     const entryLineEl = entryLineRef.current;
     if (!container || !entryLineEl || series.length < 2 || !result || entryPrice == null) return;
 
-    const dark = prefersDark();
     const chart = createChart(container, {
       width: container.clientWidth,
       height: 150,
       layout: {
         background: { color: 'transparent' },
-        textColor: dark ? '#9ca3af' : '#6b7280',
+        textColor: prefersDark() ? '#9ca3af' : '#6b7280',
         attributionLogo: false,
       },
       grid: {
@@ -91,8 +90,15 @@ export function PickChart({ series, pickDate, entryPrice }: Props) {
     });
     resizeObserver.observe(container);
 
+    const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const onColorSchemeChange = () => {
+      chart.applyOptions({ layout: { textColor: prefersDark() ? '#9ca3af' : '#6b7280' } });
+    };
+    colorSchemeQuery.addEventListener('change', onColorSchemeChange);
+
     return () => {
       resizeObserver.disconnect();
+      colorSchemeQuery.removeEventListener('change', onColorSchemeChange);
       chart.remove();
     };
   }, [series, pickDate, entryPrice, result]);
