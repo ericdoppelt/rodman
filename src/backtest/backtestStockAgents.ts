@@ -19,15 +19,19 @@ function _getBacktestUserPrompt(stockChange: StockChange, marketContext: string,
     ? news.map(n => `- [${n.published_utc.slice(0, 10)}] ${n.title}${n.description ? ` — ${n.description}` : ''}`).join('\n')
     : '(no news found for this ticker published on or before this date)';
 
-  return `Analyze ${stockChange.ticker} which dropped ${stockChange.percentageChange.toFixed(2)}% on ${date} with volume of ${stockChange.volume.toLocaleString()}.
+  return `<stock_change>
+Analyze ${stockChange.ticker} which dropped ${stockChange.percentageChange.toFixed(2)}% on ${date} with volume of ${stockChange.volume.toLocaleString()}.
+</stock_change>
 
-      Market conditions on ${date}:
-      ${marketContext}
+<market_context>
+${marketContext}
+</market_context>
 
-      News about ${stockChange.ticker} published on or before ${date}:
-      ${newsBlock}
+<news>
+${newsBlock}
+</news>
 
-      Make your case using only the information above — do not speculate about news or price action beyond it. Focus on what caused this drop on ${date} and whether it represents an overreaction or justified decline.`;
+Make your case using only the information above — do not speculate about news or price action beyond it, and do not rely on any knowledge you have of what actually happened to this stock after ${date}; reason only from what's provided, as if nothing else were known. Focus on what caused this drop on ${date} and whether it represents an overreaction or justified decline.`;
 }
 
 async function _analyzeStockChangeWithStanceBacktest(client: Anthropic, stockChange: StockChange, stance: Stance, marketContext: string, date: Date, news: NewsItem[], model: string): Promise<StockAnalysis> {

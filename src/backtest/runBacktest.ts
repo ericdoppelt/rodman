@@ -31,14 +31,25 @@ dotenv.config();
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Optional overrides so the harness can be iterated on cheaply without touching the production
-// model constants (stockAgents.ts / judgeResearch.ts) that src/index.ts's daily cron uses.
-// Unset in production's env, so main's real runs are unaffected — only set these locally when
-// debugging the backtest itself. Every scored run you actually intend to trust should be run
-// with these unset (i.e. production's real models), or the result doesn't validate what's
-// deployed. See BACKLOG.md.
+// Overrides so the harness can be iterated on cheaply without touching the production model
+// constants (stockAgents.ts / judgeResearch.ts) that src/index.ts's daily cron uses. Unset in
+// production's env, so main's real runs are unaffected. BULL_BEAR_MODEL is optional — production's
+// is already cheap Haiku, so leaving it unset (i.e. matching production) is fine for a run you
+// intend to trust. See BACKLOG.md.
 const BULL_BEAR_MODEL = process.env.BACKTEST_BULL_BEAR_MODEL || PROD_BULL_BEAR_MODEL;
-const JUDGE_MODEL = process.env.BACKTEST_JUDGE_MODEL || PROD_JUDGE_MODEL;
+// No fallback here, unlike BULL_BEAR_MODEL above: PROD_JUDGE_MODEL is claude-opus-5, which is
+// both expensive to run at backtest volume and has real memorized knowledge of 2025 stock
+// outcomes that contaminates backtest validity (see BACKLOG.md). A silent default to Opus here
+// previously caused runs to use it without anyone intending that. Require an explicit choice —
+// BACKTEST_JUDGE_MODEL=claude-sonnet-5 for cheap iteration, or =claude-opus-5 for a deliberate
+// fidelity-matched run — every time, instead of defaulting to Opus when unset.
+if (!process.env.BACKTEST_JUDGE_MODEL) {
+  throw new Error(
+    'BACKTEST_JUDGE_MODEL is not set. Set it explicitly (e.g. claude-sonnet-5 for cheap ' +
+      'iteration, or claude-opus-5 for a deliberate fidelity-matched run) before running a backtest.'
+  );
+}
+const JUDGE_MODEL = process.env.BACKTEST_JUDGE_MODEL;
 // 'single' replays production's judge as-is (at most MAX_PICKS=1/day). 'eliminate' swaps in the
 // backtest-only judge (eliminationJudge.ts) that defaults to buying every candidate and only
 // excludes one for a genuine fundamental flaw — a different hypothesis (screening out duds vs.

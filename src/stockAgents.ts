@@ -40,12 +40,15 @@ const TOOLS: Anthropic.Messages.WebSearchTool20250305[] = [
 export const TIMEOUT = 180_000;
 
 function _getUserPrompt(stockChange: StockChange, marketContext: string, date: Date): string {
-    return `Analyze ${stockChange.ticker} which dropped ${stockChange.percentageChange.toFixed(2)}% on ${date} with volume of ${stockChange.volume.toLocaleString()}.
-      
-      Market conditions on ${date}:
-      ${marketContext}
-      
-      Research ${stockChange.ticker} specifically and make your case. Focus on what caused this drop on ${date} and whether it represents an overreaction or justified decline.`;
+    return `<stock_change>
+Analyze ${stockChange.ticker} which dropped ${stockChange.percentageChange.toFixed(2)}% on ${date} with volume of ${stockChange.volume.toLocaleString()}.
+</stock_change>
+
+<market_context>
+${marketContext}
+</market_context>
+
+Research ${stockChange.ticker} specifically and make your case. Focus on what caused this drop on ${date} and whether it represents an overreaction or justified decline.`;
 }
 
 async function _researchStock(client: Anthropic, stockChange: StockChange, marketContext: string, date: Date, record?: RunRecordContext): Promise<StockResearch> {

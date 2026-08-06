@@ -21,19 +21,25 @@ Rules:
 - reasoning must be concise — 2-3 sentences maximum`;
 
 function _getUserPrompt(stockResearch: StockResearch[], formattedDate: string | undefined) {
-    const stockSummaries = stockResearch.map(({ stockChange, bull, bear }) => `
-      ${stockChange.ticker} dropped ${stockChange.percentageChange.toFixed(2)}% on ${formattedDate}
-      
-      BULL CASE (${bull.conviction} conviction):
-      ${bull.reasoning}
-      Key factors: ${bull.keyFactors.join(', ')}
-      
-      BEAR CASE (${bear.conviction} conviction):
-      ${bear.reasoning}
-      Key factors: ${bear.keyFactors.join(', ')}
-      `).join('\n---\n');
+    const stockSummaries = stockResearch.map(({ stockChange, bull, bear }) => `<stock>
+${stockChange.ticker} dropped ${stockChange.percentageChange.toFixed(2)}% on ${formattedDate}
 
-    return `Today is ${formattedDate}. Evaluate these stocks and decide which if any to recommend buying. Pick 0 stocks if you are not confident, and at most 1 if you are. \n\n${stockSummaries}`;
+<bull_case>
+Conviction: ${bull.conviction}
+${bull.reasoning}
+Key factors: ${bull.keyFactors.join(', ')}
+</bull_case>
+
+<bear_case>
+Conviction: ${bear.conviction}
+${bear.reasoning}
+Key factors: ${bear.keyFactors.join(', ')}
+</bear_case>
+</stock>`).join('\n\n');
+
+    return `Today is ${formattedDate}. Evaluate these stocks and decide which if any to recommend buying. Pick 0 stocks if you are not confident, and at most 1 if you are.
+
+${stockSummaries}`;
 }
 
 export async function pickStock(client: Anthropic, stockResearch: StockResearch[], date: Date, record?: RunRecordContext, model: string = MODEL): Promise<StockPick> {
