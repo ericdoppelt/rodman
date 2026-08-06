@@ -58,6 +58,14 @@
   }
 }
 
+@supports (-webkit-touch-callout: none) {
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-page: #141414;
+    }
+  }
+}
+
 * {
   box-sizing: border-box;
 }
