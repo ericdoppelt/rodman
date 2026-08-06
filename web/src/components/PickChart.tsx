@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { createChart, AreaSeries, type UTCTimestamp } from 'lightweight-charts';
+import { createChartEx, AreaSeries, type Time } from 'lightweight-charts';
 import type { PriceSeriesPoint } from '../types';
 import { computePickReturn, withEntryPoint, marketCloseUnixSeconds, type Trend } from '../lib/trend';
+import { toViewerTime, formatTickMark, formatCrosshairTime } from '../lib/chartTime';
+import { DayTickHorzScaleBehavior } from '../lib/dayTickScale';
 import { TrendIcon } from './TrendIcon';
 
 function prefersDark(): boolean {
@@ -34,12 +36,15 @@ export function PickChart({ series, pickDate, entryPrice }: Props) {
     const entryLineEl = entryLineRef.current;
     if (!container || !entryLineEl || series.length < 2 || !result || entryPrice == null) return;
 
-    const chart = createChart(container, {
+    const chart = createChartEx<Time, DayTickHorzScaleBehavior>(container, new DayTickHorzScaleBehavior(), {
       width: container.clientWidth,
       height: 150,
       layout: {
         background: { color: 'transparent' },
         textColor: prefersDark() ? '#9ca3af' : '#6b7280',
+        // Narrow enough labels that every trading day gets a tick, instead of the library
+        // dropping every other one and leaving an uneven run at the end.
+        fontSize: 10,
         attributionLogo: false,
       },
       grid: {
@@ -49,9 +54,14 @@ export function PickChart({ series, pickDate, entryPrice }: Props) {
       rightPriceScale: { borderVisible: false },
       timeScale: {
         borderVisible: false,
-        timeVisible: true,
+        // Day-only ticks: intraday times on the axis read as clutter, and the crosshair
+        // label still carries the exact time when you hover.
+        timeVisible: false,
         secondsVisible: false,
+        tickMarkFormatter: formatTickMark,
+        allowBoldLabels: false,
       },
+      localization: { timeFormatter: formatCrosshairTime },
       handleScroll: false,
       handleScale: false,
     });
@@ -67,9 +77,9 @@ export function PickChart({ series, pickDate, entryPrice }: Props) {
     });
 
     const displaySeries = withEntryPoint(series, pickDate, entryPrice);
-    areaSeries.setData(displaySeries.map(point => ({ time: point.time as UTCTimestamp, value: point.close })));
+    areaSeries.setData(displaySeries.map(point => ({ time: toViewerTime(point.time), value: point.close })));
 
-    const entryTime = marketCloseUnixSeconds(pickDate) as UTCTimestamp;
+    const entryTime = toViewerTime(marketCloseUnixSeconds(pickDate));
 
     const positionEntryLine = () => {
       const x = chart.timeScale().timeToCoordinate(entryTime);
