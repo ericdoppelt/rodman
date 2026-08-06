@@ -9,6 +9,7 @@ import { logRun } from './backtest/logRun.js';
 import { createSupabaseClient } from './db/supabaseClient.js';
 import { createRun, finalizeRun, failRun, recordPicks, recordRejectedCandidate } from './db/runStore.js';
 import { getGitSha } from './gitSha.js';
+import { executeTrades } from './execution/executeTrades.js';
 
 dotenv.config();
 
@@ -24,6 +25,8 @@ const MIN_MARKET_CAP = 100_000_000;
 async function main() {
   if (!process.env.MASSIVE_API_KEY) throw new Error('MASSIVE_API_KEY is not set');
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set')
+  // Alpaca creds are checked later, right before use — a missing/misconfigured trade-execution
+  // credential should never block pick generation, the pipeline's actual core output.
 
   const supabase = createSupabaseClient();
   const yesterday = new Date();
@@ -72,7 +75,23 @@ async function main() {
       picks.forEach(pick => console.log(`PICK: ${pick.ticker} — ${pick.reasoning}`));
     }
     const entryPrices = Object.fromEntries(research.map(r => [r.stockChange.ticker, r.stockChange.close]));
-    await recordPicks(supabase, runId, picks, entryPrices);
+    const recordedPicks = await recordPicks(supabase, runId, picks, entryPrices);
+
+    if (recordedPicks.length > 0) {
+      if (!process.env.ALPACA_API_KEY || !process.env.ALPACA_API_SECRET) {
+        console.warn('ALPACA_API_KEY/ALPACA_API_SECRET not set — skipping paper trade execution for this run.');
+      } else {
+        console.log('Placing paper trades on Alpaca...');
+        // Picks are already durably recorded above — an unexpected failure here must never
+        // propagate to the outer catch, which would mark this otherwise-successful run 'failed'
+        // and hide its (already-recorded, real) picks from the RLS-scoped public UI.
+        try {
+          await executeTrades(supabase, recordedPicks);
+        } catch (error) {
+          console.error('Trade execution failed unexpectedly (picks are still recorded):', error);
+        }
+      }
+    }
 
     const totalCost = getTotalCost();
     console.log(`Total cost: $${totalCost.toFixed(4)}`);

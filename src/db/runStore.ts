@@ -33,12 +33,22 @@ export async function failRun(supabase: SupabaseClient, runId: string, errorMess
   if (error) console.error(`Failed to mark run ${runId} as failed:`, error.message);
 }
 
-export async function recordPicks(supabase: SupabaseClient, runId: string, picks: StockPick, entryPrices: Record<string, number>): Promise<void> {
-  if (picks.length === 0) return;
-  const { error } = await supabase
+export async function recordPicks(
+  supabase: SupabaseClient,
+  runId: string,
+  picks: StockPick,
+  entryPrices: Record<string, number>
+): Promise<{ id: string; ticker: string }[]> {
+  if (picks.length === 0) return [];
+  const { data, error } = await supabase
     .from('picks')
-    .insert(picks.map(pick => ({ run_id: runId, ticker: pick.ticker, reasoning: pick.reasoning, entry_price: entryPrices[pick.ticker] ?? null })));
-  if (error) console.error(`Failed to record picks for run ${runId}:`, error.message);
+    .insert(picks.map(pick => ({ run_id: runId, ticker: pick.ticker, reasoning: pick.reasoning, entry_price: entryPrices[pick.ticker] ?? null })))
+    .select('id, ticker');
+  if (error) {
+    console.error(`Failed to record picks for run ${runId}:`, error.message);
+    return [];
+  }
+  return data;
 }
 
 export async function recordRejectedCandidate(

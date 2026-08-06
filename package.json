@@ -11,6 +11,7 @@
     "score-forward-test": "tsx src/backtest/scoreForwardTest.ts",
     "update-market-caps": "tsx scripts/updateMarketCapSnapshot.ts",
     "update-pick-price-series": "tsx src/updatePickPriceSeries.ts",
+    "reconcile-trades": "tsx src/execution/reconcileTrades.ts",
     "backfill-entry-prices": "tsx scripts/backfillEntryPrices.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

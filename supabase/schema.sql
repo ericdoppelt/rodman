@@ -51,9 +51,26 @@ create table if not exists pick_price_series (
   updated_at timestamptz not null default now()
 );
 
+-- One row per attempted Alpaca paper order (success or failure) for a pick.
+-- See docs/decisions/0012-alpaca-paper-trading-execution.md.
+create table if not exists trades (
+  id uuid primary key default gen_random_uuid(),
+  pick_id uuid not null references picks(id) on delete cascade,
+  symbol text not null,
+  notional_usd numeric(10, 2) not null,
+  alpaca_order_id text,
+  status text not null,
+  filled_qty numeric(18, 8),
+  filled_avg_price numeric(12, 4),
+  error text,
+  raw jsonb,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_llm_calls_run_id on llm_calls(run_id);
 create index if not exists idx_picks_run_id on picks(run_id);
 create index if not exists idx_rejected_candidates_run_id on rejected_candidates(run_id);
+create index if not exists idx_trades_pick_id on trades(pick_id);
 
 -- RLS: service_role (cron/pipeline) bypasses RLS entirely. These policies only govern
 -- anon/authenticated access, i.e. the client-facing web UI reading with the anon key.
@@ -62,6 +79,9 @@ alter table llm_calls enable row level security;
 alter table picks enable row level security;
 alter table rejected_candidates enable row level security;
 alter table pick_price_series enable row level security;
+alter table trades enable row level security;
+-- No anon/authenticated policy for trades — internal execution detail, not surfaced in the
+-- public web UI (paper trading only for now).
 
 -- Public read access: only completed runs and their picks. 'running'/'failed' rows (which
 -- can carry internal error text) stay hidden, and llm_calls/rejected_candidates have no
