@@ -264,20 +264,6 @@ main {
   font-size: 1.05rem;
   font-weight: 700;
   margin: 0;
-  position: relative;
-}
-
-.run-header h2::before {
-  content: '';
-  position: absolute;
-  left: -1.63rem;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px var(--bg-page);
 }
 
 .cost {
