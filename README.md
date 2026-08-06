@@ -48,6 +48,7 @@ This surfaces genuine uncertainty. If both arguments are strong, the judge says 
 
 - Runs nightly via a GitHub Actions cron (`.github/workflows/daily-run.yml`)
 - Every run — market context, per-stock research, picks, rejected candidates, and raw LLM calls — is persisted to Supabase (`runs`, `llm_calls`, `picks`, `rejected_candidates` tables; see `supabase/schema.sql`)
+- Each pick is automatically bought as a fixed $20 Alpaca **paper** trade (no real money) immediately after being recorded — see `docs/decisions/0012-alpaca-paper-trading-execution.md`
 - A read-only client UI (`web/`) shows completed runs and picks, reading Supabase directly with the `anon` key — see Web UI below
 - **Not yet built:** email summary
 - **In progress (V2):** feedback loop comparing past recommendations to actual stock performance over time — see Backtesting below
@@ -99,7 +100,7 @@ See `BACKLOG.md` for current results and known gaps (e.g. no reasoning-quality g
 
 `web/` is a Vite + React SPA that reads completed runs and picks directly from Supabase using the `anon` key — no backend of its own. Row Level Security scopes what that key can see: only `runs` with `status = 'completed'` and their `picks`/`pick_price_series` are readable; `llm_calls` and `rejected_candidates` have RLS enabled with no policy, so they're fully locked out from anon/authenticated access (see `supabase/schema.sql` and `docs/decisions/0002-client-ui-and-rls-scope.md`).
 
-Each pick's chart (`web/src/components/PickChart.tsx`) is rendered client-side with TradingView's open-source [Lightweight Charts](https://github.com/tradingview/lightweight-charts) library, fed by a per-pick hourly price series (from a week before the pick through today; `pick_price_series` table) that `pnpm update-pick-price-series` (`src/updatePickPriceSeries.ts`) refreshes once a day as part of the GitHub Actions cron, reusing the same Massive/Polygon key and rate-limit backoff as the main pipeline — no separate backend or live per-request calls.
+Each pick's chart (`web/src/components/PickChart.tsx`) is rendered client-side with TradingView's open-source [Lightweight Charts](https://github.com/tradingview/lightweight-charts) library, fed by a per-pick 15-min price series (from a week before the pick through today; `pick_price_series` table) that `pnpm update-pick-price-series` (`src/updatePickPriceSeries.ts`) refreshes every 15 min during market hours via its own GitHub Actions cron (`.github/workflows/update-price-series.yml`). Bars come from Alpaca's Market Data API (IEX feed, free), not Massive/Polygon — Massive's free tier only returns end-of-day bars, so charts wouldn't update until after close (see `docs/decisions/0013-alpaca-market-data-for-intraday-charts.md`).
 
 ```bash
 cd web
@@ -151,6 +152,7 @@ your .ts file → TypeScript compiler → .js file → Node.js runs it
 | **Massive (Polygon.io)** | Stock price, volume, end-of-day data; historical news (backtest only) | Rebranded from Polygon.io in Oct 2025. Free tier sufficient |
 | **Anthropic API** | Claude for reasoning and recommendations, plus the built-in `web_search` tool | Free credits on signup, pay-as-you-go after. `web_search` is Anthropic's server-side tool, not a separate news/Reddit API — Claude decides what to query |
 | **Supabase** | Postgres database for run/pick/LLM-call persistence | Free tier sufficient |
+| **Alpaca** | Executes each pick as a paper trade; also supplies intraday 15-min bars for pick charts | Free paper-trading tier, no card/funding required. Market data free tier is the IEX feed only (~2-3% of consolidated volume), not full SIP — fine for a chart, not for anything execution-sensitive. Live trading needs a separate funded/verified account — not enabled |
 
 ---
 
@@ -176,6 +178,8 @@ ANTHROPIC_API_KEY=your_key_here
 MASSIVE_API_KEY=your_key_here
 SUPABASE_URL=your_project_url
 SUPABASE_SERVICE_KEY=your_service_role_key
+ALPACA_API_KEY=your_paper_key_here
+ALPACA_API_SECRET=your_paper_secret_here
 ```
 
 Access in code:

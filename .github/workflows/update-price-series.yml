@@ -2,11 +2,13 @@ name: Update pick price series
 
 on:
   schedule:
-    # Every 30 min, 13:00-21:30 UTC (~9am-5:30pm ET), Mon-Fri — covers premarket through
-    # after-hours around a normal trading session. At today's pick volume (1/weekday, refetching
-    # full history each run) this is well within Polygon's free-tier 5-calls/min limit; see
-    # BACKLOG.md for the incremental-fetch work needed before pushing cadence much higher.
-    - cron: '0,30 13-21 * * 1-5'
+    # Every 15 min, 13:00-21:30 UTC (~9am-5:30pm ET), Mon-Fri — covers premarket through
+    # after-hours around a normal trading session, matching the 15-min bar granularity fetched
+    # below (polling faster than the bar size just refetches the same in-progress bar). At
+    # today's pick volume (1/weekday, refetching full history each run) this is well within
+    # Alpaca's free-tier 200-calls/min limit; see BACKLOG.md for the incremental-fetch work
+    # needed before pushing cadence much higher.
+    - cron: '0,15,30,45 13-21 * * 1-5'
   workflow_dispatch: {}
 
 jobs:
@@ -26,6 +28,7 @@ jobs:
 
       - run: pnpm update-pick-price-series
         env:
-          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

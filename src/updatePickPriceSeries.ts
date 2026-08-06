@@ -1,12 +1,14 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { tickerRangeAggsResponseSchema } from './schemas.js';
-import { polygonRequest } from './rateLimit.js';
+import { alpacaBarsResponseSchema } from './schemas.js';
 import { createSupabaseClient } from './db/supabaseClient.js';
 
 dotenv.config();
 
 const LOOKBACK_DAYS_BEFORE_PICK = 7;
+// Alpaca's free plan only grants the IEX feed (~2-3% of consolidated volume), not full SIP —
+// good enough for a chart, not for anything execution-sensitive. See docs/decisions/0013.
+const ALPACA_DATA_FEED = 'iex';
 
 interface PriceSeriesPoint {
   time: number; // unix seconds
@@ -17,29 +19,37 @@ function formatDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-async function fetchHourlySeries(ticker: string, pickDate: string): Promise<PriceSeriesPoint[]> {
+async function fetch15MinSeries(ticker: string, pickDate: string): Promise<PriceSeriesPoint[]> {
   const fromDate = new Date(pickDate);
   fromDate.setDate(fromDate.getDate() - LOOKBACK_DAYS_BEFORE_PICK);
 
-  const endpoint = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/1/hour/${formatDate(fromDate)}/${formatDate(new Date())}`;
-  const response = await polygonRequest(() => axios.get(endpoint, {
+  const endpoint = `https://data.alpaca.markets/v2/stocks/${ticker}/bars`;
+  const response = await axios.get(endpoint, {
     params: {
-      adjusted: true,
-      sort: 'asc',
-      apiKey: process.env.MASSIVE_API_KEY,
+      timeframe: '15Min',
+      start: formatDate(fromDate),
+      end: formatDate(new Date()),
+      adjustment: 'raw',
+      feed: ALPACA_DATA_FEED,
+      limit: 10_000,
     },
-  }));
+    headers: {
+      'APCA-API-KEY-ID': process.env.ALPACA_API_KEY,
+      'APCA-API-SECRET-KEY': process.env.ALPACA_API_SECRET,
+    },
+  });
 
-  const parsed = tickerRangeAggsResponseSchema.safeParse(response.data);
+  const parsed = alpacaBarsResponseSchema.safeParse(response.data);
   if (!parsed.success) return [];
-  return parsed.data.results.map(bar => ({
-    time: Math.floor(bar.t / 1000),
+  return (parsed.data.bars ?? []).map(bar => ({
+    time: Math.floor(new Date(bar.t).getTime() / 1000),
     close: bar.c,
   }));
 }
 
 async function main() {
-  if (!process.env.MASSIVE_API_KEY) throw new Error('MASSIVE_API_KEY is not set');
+  if (!process.env.ALPACA_API_KEY) throw new Error('ALPACA_API_KEY is not set');
+  if (!process.env.ALPACA_API_SECRET) throw new Error('ALPACA_API_SECRET is not set');
 
   const supabase = createSupabaseClient();
   const { data: picks, error } = await supabase
@@ -52,8 +62,8 @@ async function main() {
     const run = Array.isArray(pick.runs) ? pick.runs[0] : pick.runs;
     if (!run) continue;
     try {
-      console.log(`Fetching hourly price series for ${pick.ticker} (pick date ${run.run_date})...`);
-      const series = await fetchHourlySeries(pick.ticker, run.run_date);
+      console.log(`Fetching 15-min price series for ${pick.ticker} (pick date ${run.run_date})...`);
+      const series = await fetch15MinSeries(pick.ticker, run.run_date);
       if (series.length === 0) {
         console.warn(`No price data for ${pick.ticker}, skipping`);
         continue;

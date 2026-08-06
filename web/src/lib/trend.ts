@@ -32,8 +32,8 @@ export function marketCloseUnixSeconds(pickDate: string): number {
 }
 
 // Inserts entry_price as an actual plotted point at the regular-session close, so the "Picked"
-// marker always sits exactly on the line instead of near whichever hourly bar happens to be
-// closest — those come from a different Polygon endpoint and can differ slightly in price.
+// marker always sits exactly on the line instead of near whichever 15-min bar happens to be
+// closest — those come from a different Alpaca endpoint and can differ slightly in price.
 export function withEntryPoint(series: PriceSeriesPoint[], pickDate: string, entryPrice: number): PriceSeriesPoint[] {
   const time = marketCloseUnixSeconds(pickDate);
   const withoutDuplicate = series.filter(point => point.time !== time);

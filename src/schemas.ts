@@ -102,6 +102,17 @@ export const tickerRangeAggsResponseSchema = z.object({
   results: z.array(tickerAggResultSchema).optional().default([]),
 });
 
+// Alpaca Market Data API (`GET /v2/stocks/{symbol}/bars`) — used for same-day intraday bars,
+// which Polygon/Massive's free tier only returns end-of-day (see docs/decisions/0013).
+export const alpacaBarSchema = z.object({
+  t: z.string(), // RFC3339 timestamp
+  c: z.number(),
+});
+
+export const alpacaBarsResponseSchema = z.object({
+  bars: z.array(alpacaBarSchema).nullable().optional().default([]),
+});
+
 // Generic news-item shape used throughout the backtest, regardless of provider (Tavily).
 // Field names (`published_utc`) kept from the original Polygon-backed implementation since
 // nothing about them is Polygon-specific and it avoids churn in every call site.
