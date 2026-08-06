@@ -18,10 +18,8 @@ export interface ParsedJudgePick {
 
 function extractText(rawResponse: unknown): string {
   const content = (rawResponse as { content?: AnthropicContentBlock[] } | null)?.content ?? [];
-  return content
-    .filter((block): block is AnthropicContentBlock & { text: string } => block.type === 'text' && typeof block.text === 'string')
-    .map(block => block.text)
-    .join('');
+  const textBlock = content.find((block): block is AnthropicContentBlock & { text: string } => block.type === 'text' && typeof block.text === 'string');
+  return textBlock?.text ?? '';
 }
 
 export function parseMarketContext(call: LlmCall): string {
