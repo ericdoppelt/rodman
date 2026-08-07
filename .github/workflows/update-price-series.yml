@@ -3,11 +3,9 @@ name: Update pick price series and reconcile trades
 on:
   schedule:
     # GitHub's native schedule trigger is best-effort and can silently drop runs under load
-    # (confirmed in GitHub's own docs, not just observed here) — kept here only as a bonus
-    # fallback, not the real mechanism, so there's no reason to fuss over its exact minute offset.
-    # The actual 15-min cadence is driven by an external pinger (cron-job.org, free) calling this
-    # workflow's `workflow_dispatch` on schedule instead, since that's the only way to get a
-    # reliable 15-min guarantee. See BACKLOG.md and docs/decisions/0014.
+    # (confirmed in GitHub's own docs, and observed here landing every 1.5-2 hours instead of every
+    # 15 min). It is nonetheless the only trigger: the external-pinger alternative was reverted
+    # because it never got set up, leaving this on native scheduling anyway. See docs/decisions/0014.
     - cron: '0,15,30,45 13-21 * * 1-5'
   workflow_dispatch: {}
 

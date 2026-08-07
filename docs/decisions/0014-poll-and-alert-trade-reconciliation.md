@@ -63,24 +63,37 @@ fresh each invocation, not tracked across a poll loop. Terminal-status set
 `canceled`/`expired`/`rejected`/`stopped`/`suspended`/`calculated`/`done_for_day` as
 resolved-but-failed.
 
-Underlying reliability: option 2 only (external pinger) — option 1 (offsetting cron minutes) was
-considered not worth it, since the native trigger is being treated as a bonus fallback rather than
-the real mechanism once the external pinger exists; `update-price-series.yml` keeps its cron on
-plain round numbers (`0,15,30,45`) for readability. The cron-job.org pinger is a manual setup step
-outside this repo (needs a GitHub PAT and a third-party account, both requiring the repo owner's
-own credentials) and is tracked separately rather than assumed complete just because this doc
-mentions it — check BACKLOG.md for current status before assuming the 15-min cadence is actually
-reliable yet.
+Underlying reliability: **superseded — see the amendment below.** Originally option 2 (external
+pinger) only, with option 1 (offsetting cron minutes) rejected as not worth it since the native
+trigger was being demoted to a bonus fallback.
+
+### Amendment (2026-08-07): external pinger reverted, native `schedule` is the only trigger
+
+The cron-job.org pinger was never actually set up — it needed the repo owner's own GitHub PAT and
+third-party account, which never happened, so for the whole time this doc claimed a 15-min cadence
+the workflow was in fact running on the native trigger alone. Measured over 40 consecutive runs
+(2026-07-30 to 2026-08-07): every one came from `schedule`, ~5x/day, roughly 90 min apart. The user
+visible symptom was a pick sitting at "Chart pending" for hours after publication.
+
+Decision: drop the pinger from the design rather than keep an unbuilt dependency in the docs.
+`update-price-series.yml` keeps `cron: '0,15,30,45 13-21 * * 1-5'` as its sole trigger, and
+`workflow_dispatch` stays for manual runs only. Trade-off accepted: the effective cadence is
+GitHub's best-effort ~90 min, not 15 min, in exchange for zero external dependencies and no GitHub
+PAT living on a third party's infrastructure. Reconciliation was already designed to be safe under
+dropped firings (stateless single pass, "stuck" judged by wall-clock time since market open), so
+the sparse cadence delays reconciliation but does not break it. If the delay becomes intolerable,
+revisit options 3 (self-hosted cron) and 4 (cloud scheduler) above rather than re-adding a pinger.
 
 Alerting stays as originally decided: GitHub's default failure-email (free, zero new service) over
 SMS (would need a paid provider like Twilio).
 
 ## Trade-off
 
-The external pinger, once set up, hands a real credential (a GitHub PAT, even if minimally scoped)
-to a third-party service outside GitHub's own secret storage — a new trust boundary accepted in
-exchange for actually getting the 15-min cadence this project wants, since GitHub's native
-scheduler alone cannot guarantee it. Email-only alerting still means no SMS if the repo owner
+(Superseded by the amendment above: the pinger's trust-boundary trade-off no longer applies, since
+there is no pinger. The live trade-off is now cadence — GitHub's best-effort ~90 min instead of the
+configured 15 min — bought in exchange for zero external dependencies and no PAT off-platform.)
+
+Email-only alerting still means no SMS if the repo owner
 doesn't check email promptly; deferred until that actually proves insufficient. The 30-min grace
 period is a guess at "clearly stuck" vs. "still working normally," not a value anything is known to
 break at exactly.
