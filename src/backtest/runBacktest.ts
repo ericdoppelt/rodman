@@ -6,7 +6,7 @@ import { pickStocksEliminatingLosers } from './eliminationJudge.js';
 import { getTotalCost } from '../usageTracker.js';
 import { researchStockChangesBacktest } from './backtestStockAgents.js';
 import { getForwardReturns, type ForwardReturn } from './forwardReturn.js';
-import { staticMarketCapLookup } from './staticMarketCap.js';
+import { staticTickerDetailsLookup } from './staticMarketCap.js';
 import { getHistoricalMarketNews } from './fetchHistoricalMarketNews.js';
 import { getHistoricalNews } from './fetchHistoricalNews.js';
 import { buildMarketContext } from './marketContext.js';
@@ -236,7 +236,7 @@ async function main() {
         writeDailyCache(dateKey, { ...cached, forwardReturns: forwardReturnsForCache });
       };
     } else {
-      const fetched = await getLargestStockDips(testDate, DIPS_PER_DAY, MIN_DOLLAR_VOLUME, MIN_MARKET_CAP, staticMarketCapLookup);
+      const fetched = await getLargestStockDips(testDate, DIPS_PER_DAY, MIN_DOLLAR_VOLUME, MIN_MARKET_CAP, staticTickerDetailsLookup);
       dips = fetched.qualifying;
       if (dips.length === 0) {
         console.log('No qualifying dips (weekend/holiday/no data) — skipping.');

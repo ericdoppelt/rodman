@@ -21,8 +21,14 @@ export type ApiResponse = z.infer<typeof apiResponseSchema>;
 export const tickerDetailsResponseSchema = z.object({
   results: z.object({
     market_cap: z.number().optional(),
+    name: z.string().optional(),
   }),
 });
+
+export interface TickerDetails {
+  marketCap?: number | undefined;
+  name?: string | undefined;
+}
 
 export type TickerDetailsResponse = z.infer<typeof tickerDetailsResponseSchema>;
 
@@ -63,6 +69,7 @@ export interface StockChange {
   close: number;              // close price
   percentageChange: number;   // drop (percentage)
   volume: number
+  companyName?: string | undefined;  // e.g. "BillionToOne, Inc." — absent when the lookup has no name for the ticker
 }
 
 export interface StockResearch {

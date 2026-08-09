@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import { getLargestStockDips } from '../fetchTopDips.js';
 import { getForwardReturns, type ForwardReturn } from './forwardReturn.js';
-import { staticMarketCapLookup } from './staticMarketCap.js';
+import { staticTickerDetailsLookup } from './staticMarketCap.js';
 import { getHistoricalMarketNews } from './fetchHistoricalMarketNews.js';
 import { getHistoricalNews } from './fetchHistoricalNews.js';
 import { readDailyCache, writeDailyCache, hasCompleteForwardReturns } from './dailyCache.js';
@@ -74,7 +74,7 @@ async function main() {
       continue;
     }
 
-    const fetched = await getLargestStockDips(date, DIPS_PER_DAY, MIN_DOLLAR_VOLUME, MIN_MARKET_CAP, staticMarketCapLookup);
+    const fetched = await getLargestStockDips(date, DIPS_PER_DAY, MIN_DOLLAR_VOLUME, MIN_MARKET_CAP, staticTickerDetailsLookup);
     const dips = fetched.qualifying;
 
     if (dips.length === 0) {

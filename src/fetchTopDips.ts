@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { apiResponseSchema, tickerDetailsResponseSchema, type StockResult, type StockChange, type RejectedCandidate } from './schemas.js';
+import { apiResponseSchema, tickerDetailsResponseSchema, type StockResult, type StockChange, type RejectedCandidate, type TickerDetails } from './schemas.js';
 import { polygonRequest } from './rateLimit.js';
 
 function _formatDate(date: Date): string {
@@ -40,7 +40,7 @@ function _calculatePercentageChange(open: number, close: number): number {
   return ((close - open) / open) * 100;
 }
 
-async function _fetchMarketCap(ticker: string): Promise<number | undefined> {
+async function _fetchTickerDetails(ticker: string): Promise<TickerDetails> {
   const endpoint = `https://api.polygon.io/v3/reference/tickers/${ticker}`;
   const response = await polygonRequest(() => axios.get(endpoint, {
     params: {
@@ -53,7 +53,7 @@ async function _fetchMarketCap(ticker: string): Promise<number | undefined> {
     console.error('Failed to fetch ticker details for', ticker, error);
     throw error;
   });
-  if (response === null) return undefined;
+  if (response === null) return {};
 
   const parsed = tickerDetailsResponseSchema.safeParse(response.data);
   if (!parsed.success) {
@@ -62,7 +62,7 @@ async function _fetchMarketCap(ticker: string): Promise<number | undefined> {
     );
   }
 
-  return parsed.data.results.market_cap;
+  return { marketCap: parsed.data.results.market_cap, name: parsed.data.results.name };
 }
 
 function _createStockChanges(results: StockResult[]): StockChange[] {
@@ -88,9 +88,11 @@ function _orderStockDipsDescending(stockChanges: StockChange[]): StockChange[] {
  * @param limit is the maximum number of stocks returned.
  * @param minMarketCap is the minimum market cap needed to be eligible; when set, dips are checked one at a time (in order
  * of largest drop first, rate-limited between calls) until `limit` qualifying stocks are found.
- * @param marketCapLookup overrides how market cap is looked up per ticker (defaults to the live, rate-limited
- * Polygon call). The backtest passes a synchronous static-snapshot lookup instead, since Polygon's endpoint only
- * ever returns today's market cap regardless of the date requested anyway — see staticMarketCap.ts.
+ * @param detailsLookup overrides how per-ticker reference data (market cap and company name) is looked up
+ * (defaults to the live, rate-limited Polygon call). The backtest passes a synchronous static-snapshot lookup
+ * instead, since Polygon's endpoint only ever returns today's market cap regardless of the date requested
+ * anyway — see staticMarketCap.ts. The company name is what lets downstream search steps qualify a query with
+ * the real company ("BillionToOne") instead of guessing from an ambiguous ticker ("BLLN").
  * @returns `qualifying` StockChange[] with the largest drops that meet the dollar volume and market cap criteria,
  * `rejected` candidates from the market-cap scan (and why each was excluded) for traceability, and `allResults`
  * (every ticker's raw OHLCV for the day, unfiltered) so callers can derive other same-day facts — e.g. the
@@ -101,7 +103,7 @@ export async function getLargestStockDips(
   limit: number,
   minDollarVolume?: number,
   minMarketCap?: number,
-  marketCapLookup: (ticker: string) => Promise<number | undefined> | number | undefined = _fetchMarketCap,
+  detailsLookup: (ticker: string) => Promise<TickerDetails> | TickerDetails = _fetchTickerDetails,
 ): Promise<{ qualifying: StockChange[]; rejected: RejectedCandidate[]; allResults: StockResult[] }> {
   const stockResults = await _queryStockDataForDate(date);
   if (stockResults.length === 0) {
@@ -120,9 +122,9 @@ export async function getLargestStockDips(
   const rejected: RejectedCandidate[] = [];
   for (const stockChange of orderedDips) {
     if (qualifyingDips.length >= limit) break;
-    const marketCap = await marketCapLookup(stockChange.ticker);
+    const { marketCap, name } = await detailsLookup(stockChange.ticker);
     if (marketCap !== undefined && marketCap >= minMarketCap) {
-      qualifyingDips.push(stockChange);
+      qualifyingDips.push({ ...stockChange, companyName: name });
     } else {
       rejected.push({
         ticker: stockChange.ticker,

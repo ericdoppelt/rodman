@@ -34,14 +34,15 @@ const TOOLS: Anthropic.Messages.WebSearchTool20250305[] = [
     {
         type: 'web_search_20250305',
         name: 'web_search',
-        max_uses: 1
+        max_uses: 3
     }
 ];
 export const TIMEOUT = 180_000;
 
 function _getUserPrompt(stockChange: StockChange, marketContext: string, date: Date): string {
+    const company = stockChange.companyName ? ` (${stockChange.companyName})` : '';
     return `<stock_change>
-Analyze ${stockChange.ticker} which dropped ${stockChange.percentageChange.toFixed(2)}% on ${date} with volume of ${stockChange.volume.toLocaleString()}.
+Analyze ${stockChange.ticker}${company} which dropped ${stockChange.percentageChange.toFixed(2)}% on ${date} with volume of ${stockChange.volume.toLocaleString()}.
 </stock_change>
 
 <market_context>
