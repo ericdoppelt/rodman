@@ -32,7 +32,14 @@ export const MIN_MARKET_CAP = 2_000_000_000;
 // the longest horizon here does push END_DATE_BUFFER_DAYS out, shrinking the testable window (see
 // below), and any date already cached under a shorter HORIZONS list needs its forward returns
 // backfilled (see dailyCache.ts's hasCompleteForwardReturns / warmCache.ts).
-export const HORIZONS = [1, 5, 21, 42, 63, 84, 105, 126, 147, 168, 189, 210, 231, 252];
+// Capped at 126 (~6 months) rather than 252 to keep every test date clean of training
+// contamination. The judge and bull/bear models with the earliest training cutoffs still callable
+// are Sonnet 4.5 and Haiku 4.5, both Jul 2025 (everything older — Sonnet 4, Opus 4, Opus 4.1 — is
+// retired and returns an error), so test dates have to start 2025-08-01 to sit after it. A 252-day
+// horizon needs dates ~366 calendar days old, which as of Aug 2026 leaves a clean-and-measurable
+// overlap of six trading days. 126 days leaves ~111 candidate days instead. Revisit this: the
+// clean window grows a day per day, so a 252-day run becomes viable around Nov 2026.
+export const HORIZONS = [1, 5, 21, 42, 63, 84, 105, 126];
 export const PRIMARY_HORIZON = 5;
 // Most recent date considered, so the longest horizon's price history already exists. HORIZONS
 // counts *trading* days, but this buffer is in *calendar* days, so a flat +10 badly undercounts
@@ -44,4 +51,14 @@ export const END_DATE_BUFFER_DAYS = Math.ceil(Math.max(...HORIZONS) * 1.6) + 10;
 // market regime — every test day shares whatever conditions happened to hold that stretch.
 // Sampling randomly across a full year spreads days across different regimes (calm/volatile,
 // up/down markets), so a good (or bad) result is harder to explain away as "just a good month."
-export const LOOKBACK_WINDOW_DAYS = 560;
+//
+// Held to 342 rather than 560 so the earliest sampleable date stays on or after 2025-09-01, past
+// the Aug 2025 training data cutoff of Opus 4.6 — the strongest judge whose cutoff still leaves a
+// usable window (Sonnet 4.5 and Haiku 4.5 are earlier at Jul 2025, everything newer is Jan 2026 or
+// later, and everything older than 4.5 is retired). Sampling a date the judge was trained on lets
+// it score against outcomes it may simply remember. Raise this to 373 if the judge is moved to a
+// Jul 2025 model, and re-check it against the cutoff table whenever the judge changes.
+//
+// Because the window is relative to today, it drifts forward on its own — safe, since it only
+// moves further past the cutoff, though it narrows the window over time.
+export const LOOKBACK_WINDOW_DAYS = 342;

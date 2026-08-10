@@ -11,7 +11,7 @@ import { getHistoricalMarketNews } from './fetchHistoricalMarketNews.js';
 import { getHistoricalNews } from './fetchHistoricalNews.js';
 import { buildMarketContext } from './marketContext.js';
 import { logBacktestRun } from './logBacktestRun.js';
-import { readDailyCache, writeDailyCache, hasCompleteForwardReturns } from './dailyCache.js';
+import { readDailyCache, writeDailyCache, hasCompleteForwardReturns, isNonTradingDay } from './dailyCache.js';
 import { readScoredDay, writeScoredDay } from './scoringCache.js';
 import type { NewsItem, StockChange } from '../schemas.js';
 import { MODEL as PROD_BULL_BEAR_MODEL } from '../stockAgents.js';
@@ -185,6 +185,9 @@ async function main() {
     const dateKey = testDate.toISOString().slice(0, 10);
     if (triedDates.has(dateKey)) continue; // already sampled this exact date — draw again
     triedDates.add(dateKey);
+    // Market was closed, so any candidates cached under this date are junk — see isNonTradingDay
+    // in dailyCache.ts. Covers weekends and full-day holidays; half sessions are real trading days.
+    if (isNonTradingDay(dateKey)) continue;
 
     const scored = readScoredDay(RUN_KEY, dateKey);
     if (scored) {

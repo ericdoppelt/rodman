@@ -10,16 +10,29 @@ function _formatDate(date: Date): string {
 
 // Verified empirically (2026-07-30): Tavily silently ignores `end_date` unless `start_date` is
 // also present in the request — undocumented, but confirmed by direct testing (end_date-only
-// returned results dated months after the cutoff; adding a wide-open start_date fixed it). Set
-// far enough back to never exclude real historical news.
-const _WIDE_OPEN_START_DATE = '2000-01-01';
+// returned results dated months after the cutoff; adding a wide-open start_date fixed it).
+//
+// That start_date used to be wide open (2000-01-01), which left Tavily's relevance ranking with no
+// recency pressure at all — CAVA's "evidence" came back dated 4-8 months before the dip being
+// analyzed. Bounding it to a window before the test date trades coverage for relevance: thin
+// names now return fewer or zero results rather than padding with stale context, which is the
+// honest failure mode for a backtest.
+const _LOOKBACK_DAYS = 45;
+
+function _lookbackStart(beforeDate: Date): Date {
+    const start = new Date(beforeDate);
+    start.setDate(start.getDate() - _LOOKBACK_DAYS);
+    return start;
+}
 
 /**
  * Point-in-time-safe web search via Tavily's `end_date` filter (server-enforced, unlike Claude's
  * live `web_search` tool which has no date-restriction parameter at all — see
  * docs/decisions/0005-tavily-for-backtest-evidence.md). Replaces the earlier Polygon-news-only
  * evidence source with broader web coverage, closer to what production's live web_search sees.
- * `topic: 'news'` is required to get `published_date` back on each result.
+ * `topic: 'finance'` keeps `published_date` on each result while biasing away from the generic-web
+ * matches that made short/common-word tickers (BULL, CAR, Q, BE) return articles about unrelated
+ * companies and concepts.
  */
 export async function tavilySearch(query: string, beforeDate: Date, limit: number): Promise<NewsItem[]> {
   const apiKey = process.env.TAVILY_API_KEY;
@@ -27,8 +40,9 @@ export async function tavilySearch(query: string, beforeDate: Date, limit: numbe
 
   const response = await axios.post('https://api.tavily.com/search', {
     query,
-    topic: 'news',
-    start_date: _WIDE_OPEN_START_DATE,
+    topic: 'finance',
+    search_depth: 'advanced',
+    start_date: _formatDate(_lookbackStart(beforeDate)),
     end_date: _formatDate(beforeDate),
     max_results: limit,
   }, {

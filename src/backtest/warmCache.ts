@@ -4,7 +4,7 @@ import { getForwardReturns, type ForwardReturn } from './forwardReturn.js';
 import { staticTickerDetailsLookup } from './staticMarketCap.js';
 import { getHistoricalMarketNews } from './fetchHistoricalMarketNews.js';
 import { getHistoricalNews } from './fetchHistoricalNews.js';
-import { readDailyCache, writeDailyCache, hasCompleteForwardReturns } from './dailyCache.js';
+import { readDailyCache, writeDailyCache, hasCompleteForwardReturns, isNonTradingDay } from './dailyCache.js';
 import type { NewsItem } from '../schemas.js';
 import {
   DIPS_PER_DAY,
@@ -53,6 +53,19 @@ async function main() {
   for (let i = 0; i < totalDays; i++) {
     const date = new Date(earliestDate.getTime() + i * 24 * 60 * 60 * 1000);
     const dateKey = date.toISOString().slice(0, 10);
+
+    // Markets are closed, and Polygon's grouped endpoint doesn't reliably say so — it sometimes
+    // returns the prior session's bars, which would then be cached under this date. Record the
+    // empty result without calling Polygon at all. See isNonTradingDay in dailyCache.ts.
+    if (isNonTradingDay(dateKey)) {
+      if (!readDailyCache(dateKey)) {
+        writeDailyCache(dateKey, { dips: [], allResults: [], marketNews: [], perTickerNews: {}, forwardReturns: {} });
+        empty++;
+      } else {
+        skipped++;
+      }
+      continue;
+    }
 
     const existing = readDailyCache(dateKey);
     if (existing && hasCompleteForwardReturns(existing, HORIZONS)) {
