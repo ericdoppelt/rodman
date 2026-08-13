@@ -67,9 +67,27 @@ export interface StockChange {
   ticker: string;             // ticker symbol
   open: number;               // open price
   close: number;              // close price
-  percentageChange: number;   // drop (percentage)
+  percentageChange: number;   // intraday drop, open -> close (percentage). This is what candidates
+                              // are ranked by — see docs/decisions/0017 for why intraday and not
+                              // day-over-day.
   volume: number
   companyName?: string | undefined;  // e.g. "BillionToOne, Inc." — absent when the lookup has no name for the ticker
+  previousClose?: number | undefined; // prior session's close; absent when that session couldn't be fetched
+}
+
+/**
+ * Splits a day's move into the part that happened overnight and the part that happened during the
+ * session. Ranking uses the intraday number alone, but an agent told only "fell 12.85%" about a
+ * stock that actually fell 39% on the day will contradict its own prompt — BLLN's bear case did
+ * exactly that. Returns undefined when there is no previous close to compare against.
+ */
+export function splitDayMove(stockChange: StockChange): { gapPct: number; dayOverDayPct: number } | undefined {
+  const { previousClose, open, close } = stockChange;
+  if (previousClose === undefined || previousClose <= 0) return undefined;
+  return {
+    gapPct: ((open - previousClose) / previousClose) * 100,
+    dayOverDayPct: ((close - previousClose) / previousClose) * 100,
+  };
 }
 
 export interface StockResearch {

@@ -28,36 +28,10 @@ function _pathFor(dateKey: string): string {
   return join(CACHE_DIR, `${dateKey}.json`);
 }
 
-// NYSE full-day closures. Half sessions (the day after Thanksgiving, Christmas Eve) are real
-// trading days and deliberately absent. Extend this when the sampling window moves past 2026.
-const MARKET_HOLIDAYS = new Set([
-  '2025-01-01', '2025-01-20', '2025-02-17', '2025-04-18', '2025-05-26',
-  '2025-06-19', '2025-07-04', '2025-09-01', '2025-11-27', '2025-12-25',
-  '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25',
-  '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25',
-]);
-
-/**
- * True for dates the US market was closed — weekends and full-day holidays.
- *
- * Polygon's grouped-daily endpoint cannot be trusted to return an empty result for these. Of 151
- * cached weekend dates, 18 came back with bars; Thanksgiving and Christmas 2025 each came back
- * with ~11.6k rows. That data isn't a copy of an adjacent session either (the hashes differ), so
- * there is no way to detect it from the payload — hence an explicit calendar. Labor Day 2025 did
- * come back empty, so the behavior isn't even consistent day to day.
- *
- * A date like this looks like an ordinary test day — it has four qualifying dips — but its
- * candidates are junk while forward returns are measured from a date the market never traded on.
- * Sampling and cache warming both skip these rather than trusting the endpoint.
- *
- * Reads the day-of-week in UTC from the date key itself, which is how cache entries are keyed —
- * deriving it from a local-midnight Date would disagree across timezones.
- */
-export function isNonTradingDay(dateKey: string): boolean {
-  if (MARKET_HOLIDAYS.has(dateKey)) return true;
-  const day = new Date(`${dateKey}T12:00:00.000Z`).getUTCDay();
-  return day === 0 || day === 6;
-}
+// Re-exported so backtest callers keep importing it from here. The calendar itself lives in
+// src/marketCalendar.ts because production needs it too — fetchTopDips walks back to the previous
+// session to compute the overnight gap, and must skip the same closed days for the same reason.
+export { isNonTradingDay } from '../marketCalendar.js';
 
 export function readDailyCache(dateKey: string): DailyCacheEntry | undefined {
   const path = _pathFor(dateKey);

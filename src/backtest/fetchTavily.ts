@@ -30,9 +30,14 @@ function _lookbackStart(beforeDate: Date): Date {
  * live `web_search` tool which has no date-restriction parameter at all — see
  * docs/decisions/0005-tavily-for-backtest-evidence.md). Replaces the earlier Polygon-news-only
  * evidence source with broader web coverage, closer to what production's live web_search sees.
- * `topic: 'finance'` keeps `published_date` on each result while biasing away from the generic-web
- * matches that made short/common-word tickers (BULL, CAR, Q, BE) return articles about unrelated
- * companies and concepts.
+ * `topic: 'news'` is required to get `published_date` back on each result. BACKLOG.md proposed
+ * switching to `'finance'` to cut down on the generic-web matches that made short/common-word
+ * tickers (BULL, CAR, Q, BE) pull in unrelated articles, but measured against real dates it was a
+ * clear loss: `'finance'` returns no `published_date` at all (so every article silently falls back
+ * to the cutoff date and the point-in-time signal is gone), returns 1-3 per-ticker articles where
+ * `'news'` returns 5, and returns *nothing* for the generic "US stock market" query the market
+ * context is built from. Qualifying the query with the company name is what actually fixes the
+ * collisions; the topic switch was not.
  */
 export async function tavilySearch(query: string, beforeDate: Date, limit: number): Promise<NewsItem[]> {
   const apiKey = process.env.TAVILY_API_KEY;
@@ -40,7 +45,7 @@ export async function tavilySearch(query: string, beforeDate: Date, limit: numbe
 
   const response = await axios.post('https://api.tavily.com/search', {
     query,
-    topic: 'finance',
+    topic: 'news',
     search_depth: 'advanced',
     start_date: _formatDate(_lookbackStart(beforeDate)),
     end_date: _formatDate(beforeDate),

@@ -50,6 +50,19 @@ if (!process.env.BACKTEST_JUDGE_MODEL) {
   );
 }
 const JUDGE_MODEL = process.env.BACKTEST_JUDGE_MODEL;
+// The Tavily evidence this harness runs on was measured unfit — 16% of returned articles are both
+// about the right company and recent enough to explain the drop, and Tavily never returns an empty
+// result, so agents always get five confident-looking articles whether or not real news exists.
+// See docs/decisions/0016-shelve-tavily-backtest.md. The harness itself is sound and kept for a
+// future point-in-time news source (swap `newsLookup`); the gate exists so a number can't be
+// produced and believed without having read why it is untrustworthy.
+if (!process.env.BACKTEST_ACKNOWLEDGE_EVIDENCE) {
+  throw new Error(
+    'This backtest is shelved: its Tavily evidence was measured unfit (see ' +
+      'docs/decisions/0016-shelve-tavily-backtest.md). Validation lives in the forward test ' +
+      '(pnpm score-forward-test). To run anyway, set BACKTEST_ACKNOWLEDGE_EVIDENCE=1.'
+  );
+}
 // 'single' replays production's judge as-is (at most MAX_PICKS=1/day). 'eliminate' swaps in the
 // backtest-only judge (eliminationJudge.ts) that defaults to buying every candidate and only
 // excludes one for a genuine fundamental flaw — a different hypothesis (screening out duds vs.

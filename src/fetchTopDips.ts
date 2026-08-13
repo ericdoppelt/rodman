@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { apiResponseSchema, tickerDetailsResponseSchema, type StockResult, type StockChange, type RejectedCandidate, type TickerDetails } from './schemas.js';
 import { polygonRequest } from './rateLimit.js';
+import { previousTradingDay } from './marketCalendar.js';
 
 function _formatDate(date: Date): string {
   const year = date.getFullYear();
@@ -65,14 +66,31 @@ async function _fetchTickerDetails(ticker: string): Promise<TickerDetails> {
   return { marketCap: parsed.data.results.market_cap, name: parsed.data.results.name };
 }
 
-function _createStockChanges(results: StockResult[]): StockChange[] {
+function _createStockChanges(results: StockResult[], previousCloses: Map<string, number>): StockChange[] {
   return results.map(res => ({
     ticker: res.T,
     open: res.o,
     close: res.c,
     percentageChange: _calculatePercentageChange(res.o, res.c),
     volume: res.v,
+    previousClose: previousCloses.get(res.T),
   }));
+}
+
+/**
+ * Closes from the session before `date`, keyed by ticker, for computing each candidate's overnight
+ * gap. One extra grouped-daily call per run. Returns an empty map rather than throwing if that
+ * session can't be fetched: the gap is context for the prompt, not something ranking depends on,
+ * so losing it should degrade the analysis rather than fail the run.
+ */
+async function _fetchPreviousCloses(date: Date): Promise<Map<string, number>> {
+  const previous = previousTradingDay(date);
+  if (!previous) return new Map();
+  const results = await _queryStockDataForDate(previous).catch(error => {
+    console.warn('Could not fetch previous session for gap calculation:', error instanceof Error ? error.message : error);
+    return [] as StockResult[];
+  });
+  return new Map(results.map(res => [res.T, res.c]));
 }
 
 function _orderStockDipsDescending(stockChanges: StockChange[]): StockChange[] {
@@ -111,7 +129,8 @@ export async function getLargestStockDips(
     return { qualifying: [], rejected: [], allResults: [] };
   }
   const filteredStockResults = (minDollarVolume !== undefined) ? stockResults.filter(sc => sc.v * sc.c >= minDollarVolume) : stockResults;
-  const stockChanges = _createStockChanges(filteredStockResults);
+  const previousCloses = await _fetchPreviousCloses(date);
+  const stockChanges = _createStockChanges(filteredStockResults, previousCloses);
   const orderedDips = _orderStockDipsDescending(stockChanges);
 
   if (minMarketCap === undefined) {

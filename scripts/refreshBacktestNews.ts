@@ -45,7 +45,10 @@ async function main() {
       continue;
     }
 
-    const date = new Date(`${dateKey}T00:00:00.000Z`);
+    // Local noon, not UTC midnight: fetchTavily formats `end_date` from local date components, so
+    // a UTC-midnight Date reads as the previous day west of Greenwich and shifts the evidence
+    // cutoff a day early.
+    const date = new Date(`${dateKey}T12:00:00`);
 
     const dips = existing.dips.map(dip => {
       const { name } = staticTickerDetailsLookup(dip.ticker);

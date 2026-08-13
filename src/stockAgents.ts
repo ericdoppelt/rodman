@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { type StockChange, type Stance, stockAnalysisSchema, type StockAnalysis, type StockResearch, type RejectedCandidate } from './schemas.js';
+import { splitDayMove, type StockChange, type Stance, stockAnalysisSchema, type StockAnalysis, type StockResearch, type RejectedCandidate } from './schemas.js';
 import { trackUsage, calculateCallCost } from './usageTracker.js';
 import { recordLlmCall, type RunRecordContext } from './db/llmCallStore.js';
 import { recordRejectedCandidate } from './db/runStore.js';
@@ -51,8 +51,21 @@ export const TIMEOUT = 180_000;
 
 function _getUserPrompt(stockChange: StockChange, marketContext: string, date: Date): string {
     const company = stockChange.companyName ? ` (${stockChange.companyName})` : '';
+    // Candidates are ranked on the intraday move alone (see docs/decisions/0017), but stating only
+    // that number misdescribes the day whenever the drop began overnight. BLLN's bear case openly
+    // contradicted its prompt — "goes well beyond the modest 12.85% figure mentioned in the prompt"
+    // — because the real move was 39%, most of it an after-hours earnings reaction. Give the whole
+    // shape of the day and be explicit about which part the screen selected on.
+    const split = splitDayMove(stockChange);
+    const move = split
+        ? `fell ${Math.abs(split.dayOverDayPct).toFixed(2)}% on ${date}, measured from the prior close.
+That move breaks down into a ${split.gapPct >= 0 ? 'gap up' : 'gap down'} of ${split.gapPct.toFixed(2)}% overnight, then ${stockChange.percentageChange.toFixed(2)}% during the session itself.
+This stock was selected for the intraday portion — sustained selling while the market was open, which is the overreaction this strategy looks for. The overnight gap is usually the market repricing on news; the intraday slide is where participants may have overshot.`
+        : `dropped ${stockChange.percentageChange.toFixed(2)}% during the session on ${date} (open to close; the prior close was unavailable, so the full day-over-day move is unknown)`;
+
     return `<stock_change>
-Analyze ${stockChange.ticker}${company} which dropped ${stockChange.percentageChange.toFixed(2)}% on ${date} with volume of ${stockChange.volume.toLocaleString()}.
+Analyze ${stockChange.ticker}${company}, which ${move}
+Volume was ${stockChange.volume.toLocaleString()}.
 </stock_change>
 
 <market_context>
