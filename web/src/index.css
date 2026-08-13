@@ -756,9 +756,12 @@ main {
   color: var(--ink-muted);
 }
 
-/* The disclosure has already consumed the slack, so the meta line below it sits tight
-   rather than being pushed down a second time by its own auto margin. */
-.flow-case > .flow-search + p.flow-meta {
+/* The disclosure has already consumed the slack, so the meta line below it sits tight rather
+   than being pushed down a second time by its own auto margin. `:last-child` is needed to
+   outrank `.flow-case > p.flow-meta:last-child` further down the file — without it the two
+   selectors tie on specificity, the later one wins, and both elements keep an auto margin
+   that splits the free space between them. */
+.flow-case > .flow-search + p.flow-meta:last-child {
   margin-top: 0;
   padding-top: 0.5rem;
 }
