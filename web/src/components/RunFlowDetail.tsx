@@ -1,10 +1,49 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { parseAnalysis, parseJudgePicks, parseMarketContext } from '../lib/parseLlmCall';
-import type { RunFlow } from '../types';
+import { parseAnalysis, parseJudgePicks, parseMarketContext, parseSearches } from '../lib/parseLlmCall';
+import type { LlmCall, RunFlow } from '../types';
 import { PulseLoader } from './PulseLoader';
 
 const PRE_RESEARCH_REASONS = new Set(['below_min_market_cap', 'no_market_cap_data']);
+
+/**
+ * Bull/bear analyses can't carry inline citations (their only text block is schema-constrained
+ * JSON), but the searches behind them are stored on the response. This shows what the agent
+ * actually read — including searches the budget refused, which is the signal that the ticker
+ * was researched on thinner evidence than the model wanted.
+ */
+function SearchSources({ call }: { call: LlmCall }) {
+  const groups = parseSearches(call);
+  const resultCount = groups.reduce((n, g) => n + g.results.length, 0);
+  if (resultCount === 0) return null;
+
+  return (
+    <details className="flow-search">
+      {/* Header stays a plain count — a capped search is normal cost control, not a fault,
+          and shouldn't read as one at a glance. The detail is inside for anyone who opens it. */}
+      <summary>Sources consulted ({resultCount})</summary>
+      {groups.map((group, i) => (
+        <div key={i} className="flow-search-group">
+          <p className="flow-search-query">{group.query || '(query not recorded)'}</p>
+          {group.errorCode ? (
+            <p className="flow-search-error">
+              {group.errorCode === 'max_uses_exceeded' ? 'not run — search budget reached' : `not run — ${group.errorCode.replaceAll('_', ' ')}`}
+            </p>
+          ) : (
+            <ul>
+              {group.results.map(result => (
+                <li key={result.url}>
+                  <a href={result.url} target="_blank" rel="noreferrer noopener">{result.title}</a>
+                  <span className="flow-search-host">{result.host}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+    </details>
+  );
+}
 
 interface Props {
   runId: string;
@@ -48,6 +87,7 @@ export function RunFlowDetail({ runId }: Props) {
   }
 
   const marketContextCall = run.llm_calls.find(c => c.call_type === 'market_context');
+  const marketContext = marketContextCall ? parseMarketContext(marketContextCall) : null;
   const judgeCall = run.llm_calls.find(c => c.call_type === 'judge');
   const bullCalls = run.llm_calls.filter(c => c.call_type === 'bull');
   const bearCalls = run.llm_calls.filter(c => c.call_type === 'bear');
@@ -66,7 +106,42 @@ export function RunFlowDetail({ runId }: Props) {
       <section className="flow-step">
         <h2>Market context</h2>
         <div className="flow-card">
-          <p className="flow-context-text">{marketContextCall ? parseMarketContext(marketContextCall) : 'Not recorded for this run.'}</p>
+          {marketContext ? (
+            <>
+              <p className="flow-context-text">
+                {marketContext.segments.map((segment, i) => (
+                  <span key={i}>
+                    {segment.text}
+                    {segment.sourceNumbers.map(n => (
+                      <sup key={n} className="flow-cite">
+                        <a
+                          href={marketContext.sources[n - 1].url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          title={marketContext.sources[n - 1].title}
+                        >
+                          {n}
+                        </a>
+                      </sup>
+                    ))}
+                  </span>
+                ))}
+              </p>
+              {marketContext.sources.length > 0 && (
+                <ol className="flow-sources">
+                  {marketContext.sources.map(source => (
+                    <li key={source.url}>
+                      <a href={source.url} target="_blank" rel="noreferrer noopener">
+                        {source.title}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </>
+          ) : (
+            <p className="flow-context-text">Not recorded for this run.</p>
+          )}
           {marketContextCall && (
             <p className="flow-meta">
               {marketContextCall.model} · {(marketContextCall.latency_ms / 1000).toFixed(1)}s · ${marketContextCall.cost_usd.toFixed(4)}
@@ -126,6 +201,7 @@ export function RunFlowDetail({ runId }: Props) {
                       ) : (
                         <p className="flow-case-missing">Not recorded.</p>
                       )}
+                      {bull && <SearchSources call={bull} />}
                       {bull && (
                         <p className="flow-meta">
                           {bull.model} · {(bull.latency_ms / 1000).toFixed(1)}s · ${bull.cost_usd.toFixed(4)}
@@ -149,6 +225,7 @@ export function RunFlowDetail({ runId }: Props) {
                       ) : (
                         <p className="flow-case-missing">Not recorded.</p>
                       )}
+                      {bear && <SearchSources call={bear} />}
                       {bear && (
                         <p className="flow-meta">
                           {bear.model} · {(bear.latency_ms / 1000).toFixed(1)}s · ${bear.cost_usd.toFixed(4)}

@@ -683,6 +683,113 @@ main {
   white-space: pre-wrap;
 }
 
+/* Superscript source marker on a cited span of the market-context summary. */
+.flow-cite {
+  font-size: 0.62rem;
+  line-height: 0;
+  margin-left: 0.1em;
+  vertical-align: super;
+}
+
+.flow-cite a {
+  color: var(--accent, #4a7fd4);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+  padding: 0 0.08em;
+}
+
+.flow-cite a:hover {
+  text-decoration: underline;
+}
+
+.flow-sources {
+  margin: 1rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.flow-sources li {
+  margin-top: 0.2rem;
+  /* Long URLs used as fallback titles must not widen the card. */
+  overflow-wrap: anywhere;
+}
+
+.flow-sources a {
+  color: var(--ink-muted);
+  text-decoration: none;
+}
+
+.flow-sources a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+/* Collapsed "Sources consulted" disclosure on a bull/bear case. */
+.flow-search {
+  margin-top: 0.75rem;
+  font-size: 0.76rem;
+  color: var(--ink-muted);
+}
+
+.flow-search > summary {
+  cursor: pointer;
+  list-style: revert;
+  padding: 0.15rem 0;
+}
+
+.flow-search > summary:hover {
+  color: var(--ink);
+}
+
+.flow-search-refused {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.flow-search-group {
+  margin-top: 0.55rem;
+}
+
+.flow-search-query {
+  margin: 0;
+  font-style: italic;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+
+.flow-search-error {
+  margin: 0.1rem 0 0;
+  opacity: 0.7;
+}
+
+.flow-search-group ul {
+  margin: 0.2rem 0 0;
+  padding-left: 1.1rem;
+  line-height: 1.45;
+}
+
+.flow-search-group li {
+  margin-top: 0.15rem;
+  overflow-wrap: anywhere;
+}
+
+.flow-search-group a {
+  color: var(--ink-muted);
+  text-decoration: none;
+}
+
+.flow-search-group a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.flow-search-host {
+  margin-left: 0.4em;
+  opacity: 0.65;
+}
+
 .flow-chip-list {
   list-style: none;
   margin: 0;
