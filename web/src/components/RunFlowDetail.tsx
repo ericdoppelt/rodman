@@ -257,15 +257,7 @@ export function RunFlowDetail({ runId }: Props) {
         <div className="flow-card">
           {judgePicks.length === 0 ? (
             noPickReason ? (
-              <>
-                <p className="no-pick no-pick--explained">{noPickReason}</p>
-                {run.no_pick_reason_backfilled_at && (
-                  <p className="flow-reconstructed">
-                    Reconstructed after the fact — this run predates the judge recording its reason,
-                    so this explains the decision rather than being what was written that day.
-                  </p>
-                )}
-              </>
+              <p className="no-pick no-pick--explained">{noPickReason}</p>
             ) : (
               <p className="no-pick">No stock met the bar for a recommendation this day.</p>
             )

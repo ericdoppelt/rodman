@@ -734,17 +734,6 @@ main {
   text-align: left;
 }
 
-/* Marks content produced after the fact rather than during the run. Deliberately plain and
-   always visible — a reconstruction must never be mistaken for a contemporaneous record. */
-.flow-reconstructed {
-  margin: 0.75rem 0 0;
-  padding-top: 0.6rem;
-  border-top: 1px dashed var(--rule, rgba(0, 0, 0, 0.12));
-  color: var(--ink-muted);
-  font-size: 0.76rem;
-  line-height: 1.45;
-}
-
 /* Collapsed "Sources consulted" disclosure on a bull/bear case.
    `margin-top: auto` sinks it to the bottom of the flex column so it sits directly above the
    model/latency/cost line, keeping the two footers aligned across a bull and bear pair whose
