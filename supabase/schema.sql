@@ -104,6 +104,29 @@ create policy "public can read completed runs"
   to anon, authenticated
   using (status = 'completed');
 
+-- RLS is row-level: admitting a row admits every column in it. `error` can carry internal
+-- detail (stack traces, request IDs), and reconstructing a failed run flips its status to
+-- 'completed' — which would otherwise expose exactly what hiding failed runs was protecting.
+-- Column grants are the second layer. A column-level REVOKE is inert while the role holds
+-- table-level SELECT, so the table-wide grant is dropped and re-granted per column.
+--
+-- MAINTENANCE: a column added to `runs` later is NOT public until listed here. That is
+-- deliberate — new columns default to private rather than silently becoming world-readable.
+revoke select on runs from anon, authenticated;
+grant select (
+  id,
+  run_date,
+  params,
+  git_sha,
+  status,
+  total_cost_usd,
+  no_pick_reason,
+  no_pick_reason_backfilled_at,
+  reconstructed_at,
+  created_at,
+  completed_at
+) on runs to anon, authenticated;
+
 create policy "public can read picks for completed runs"
   on picks for select
   to anon, authenticated
