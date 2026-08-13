@@ -745,11 +745,22 @@ main {
   line-height: 1.45;
 }
 
-/* Collapsed "Sources consulted" disclosure on a bull/bear case. */
+/* Collapsed "Sources consulted" disclosure on a bull/bear case.
+   `margin-top: auto` sinks it to the bottom of the flex column so it sits directly above the
+   model/latency/cost line, keeping the two footers aligned across a bull and bear pair whose
+   analyses differ in length. */
 .flow-search {
-  margin-top: 0.75rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
   font-size: 0.76rem;
   color: var(--ink-muted);
+}
+
+/* The disclosure has already consumed the slack, so the meta line below it sits tight
+   rather than being pushed down a second time by its own auto margin. */
+.flow-case > .flow-search + p.flow-meta {
+  margin-top: 0;
+  padding-top: 0.5rem;
 }
 
 .flow-search > summary {
