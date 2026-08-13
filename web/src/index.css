@@ -727,10 +727,13 @@ main {
 }
 
 /* A no-pick day the judge actually explained, rather than the UI's generic fallback. */
+/* Matches .flow-context-text — both are long prose blocks inside a .flow-card, and without
+   an explicit size this one inherits the 1rem body default and reads oversized next to it. */
 .no-pick--explained {
   font-style: normal;
   color: var(--ink);
   line-height: 1.6;
+  font-size: 0.92rem;
   text-align: left;
 }
 
