@@ -27,7 +27,11 @@ export async function parseWithRetry<ParsedT>(
     const response = await client.messages.create({ ...params, messages }, requestOptions);
     await onAttempt?.(response);
 
-    const textBlock = response.content.find((block): block is Anthropic.TextBlock => block.type === 'text');
+    // findLast, not find: server-side web_search keeps the turn alive after each search, so the
+    // model can write a complete answer, search again, and rewrite it — leaving several full JSON
+    // drafts in one response. Only the last one reflects every search it ran. Taking the first
+    // fed the judge a pre-final draft on 44 of 244 bull/bear calls before this was caught.
+    const textBlock = response.content.findLast((block): block is Anthropic.TextBlock => block.type === 'text');
     if (!textBlock) throw new Error('No text content block in response to parse');
 
     try {

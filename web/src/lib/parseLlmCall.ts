@@ -23,8 +23,11 @@ function textBlocks(rawResponse: unknown): string[] {
     .map(block => block.text);
 }
 
+// The last text block, matching parseWithRetry.ts — a response that searched again after
+// drafting an answer holds several complete drafts, and only the final one is what the
+// pipeline parsed and acted on.
 function extractText(rawResponse: unknown): string {
-  return textBlocks(rawResponse)[0] ?? '';
+  return textBlocks(rawResponse).at(-1) ?? '';
 }
 
 // Market context is free-form prose, and a web_search response splits it across
