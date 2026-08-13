@@ -42,7 +42,9 @@ export async function parseWithRetry<ParsedT>(
       console.warn(`Structured output failed validation (attempt ${attempt + 1}/${MAX_VALIDATION_RETRIES + 1}), retrying:`, message);
       messages = [
         ...messages,
-        { role: 'assistant', content: textBlock.text },
+        // Echo the whole content array, not just the text: with thinking enabled the
+        // assistant turn carries signed thinking blocks that must be replayed unmodified.
+        { role: 'assistant', content: response.content },
         { role: 'user', content: `That response did not satisfy the required schema:\n${message}\n\nRespond again with valid output that satisfies the schema.` },
       ];
     }

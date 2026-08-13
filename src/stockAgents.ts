@@ -30,6 +30,16 @@ Rules:
 
 export const MODEL = 'claude-haiku-4-5-20251001';
 export const MAX_TOKENS = 4096;
+// Haiku 4.5 predates adaptive thinking — `{type: 'adaptive'}` and `output_config.effort`
+// both error on it, so the budgeted form is the only one available. Without a thinking
+// block the schema-constrained JSON is the model's only output channel, so "let me search
+// once more and reconsider" can only be expressed as a second complete answer: 44 of 244
+// bull/bear calls emitted duplicate drafts that way. budget_tokens counts against
+// MAX_TOKENS; 2048 leaves ~1200 tokens of headroom over the longest analysis seen (850).
+const THINKING: Anthropic.Messages.ThinkingConfigParam = {
+    type: 'enabled',
+    budget_tokens: 2048
+};
 const TOOLS: Anthropic.Messages.WebSearchTool20250305[] = [
     {
         type: 'web_search_20250305',
@@ -88,6 +98,7 @@ async function _analyzeStockChangeWithStance(client: Anthropic, stockChange: Sto
             model: MODEL,
             max_tokens: MAX_TOKENS,
             system: systemPrompt,
+            thinking: THINKING,
             tools: TOOLS,
             output_config: {
                 format: zodOutputFormat(stockAnalysisSchema)

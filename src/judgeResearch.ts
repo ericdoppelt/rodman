@@ -10,6 +10,17 @@ export const MAX_TOKENS = 8096;
 const TOOLS: Anthropic.Messages.WebSearchTool20250305[] = [];
 const TIMEOUT = 180_000;
 
+// No `thinking` config here on purpose. Opus 5 thinks by default but returns
+// `thinking: ""`, because `display` defaults to "omitted" — hence the empty thinking block
+// on every stored judge call. Per Anthropic's docs, `display: "summarized"` should return a
+// readable summary on Opus 5, but as of 2026-08-13 it returns nothing against this API key.
+// Ruled out: our request shape (empty with and without tools/structured outputs), the SDK
+// (raw fetch with no SDK returns the same empty block over HTTP 200), and the model (Opus 4.8
+// returns empty too, on the docs' own verbatim example). Looks account- or platform-side —
+// worth retrying in a few weeks, or asking Anthropic support. Either way, a summary
+// is not a commitment: to capture why the judge picked nothing, add a no-pick reason to
+// `stockPickSchema` so the model has to state it in its own output.
+
 export const JUDGE_SYSTEM_PROMPT = `You are a decisive senior investment analyst tasked with identifying the best buying opportunities from a set of stocks that dropped significantly in a single day.
 
 You will be given bull and bear cases for each stock. Your job is to evaluate the arguments and recommend at most ${MAX_PICKS} stock(s) to buy.
