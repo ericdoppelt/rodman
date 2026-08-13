@@ -50,6 +50,12 @@ export interface RunFlow {
   id: string;
   run_date: string;
   total_cost_usd: number | null;
+  /** Judge's stated reason for making no pick. */
+  no_pick_reason: string | null;
+  /** Non-null means the reason was reconstructed later, not recorded during the run. */
+  no_pick_reason_backfilled_at: string | null;
+  /** Non-null means the run was completed by replaying stored research after it failed. */
+  reconstructed_at: string | null;
   picks: Pick[];
   llm_calls: LlmCall[];
   rejected_candidates: RejectedCandidate[];

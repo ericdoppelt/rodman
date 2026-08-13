@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { type StockPick, type StockResearch, stockPickSchema, MAX_PICKS } from './schemas.js';
+import { type JudgeOutput, type StockResearch, judgeOutputSchema, MAX_PICKS } from './schemas.js';
 import { trackUsage, calculateCallCost } from './usageTracker.js';
 import { recordLlmCall, type RunRecordContext } from './db/llmCallStore.js';
 import { parseWithRetry } from './parseWithRetry.js';
@@ -17,9 +17,9 @@ const TIMEOUT = 180_000;
 // Ruled out: our request shape (empty with and without tools/structured outputs), the SDK
 // (raw fetch with no SDK returns the same empty block over HTTP 200), and the model (Opus 4.8
 // returns empty too, on the docs' own verbatim example). Looks account- or platform-side —
-// worth retrying in a few weeks, or asking Anthropic support. Either way, a summary
-// is not a commitment: to capture why the judge picked nothing, add a no-pick reason to
-// `stockPickSchema` so the model has to state it in its own output.
+// worth retrying in a few weeks, or asking Anthropic support. Either way, a summary is not a
+// commitment — which is why `judgeOutputSchema` requires `noPickReason` instead: the model has
+// to state its reason in its own output, where it is validated and stored.
 
 export const JUDGE_SYSTEM_PROMPT = `You are a decisive senior investment analyst tasked with identifying the best buying opportunities from a set of stocks that dropped significantly in a single day.
 
@@ -27,11 +27,14 @@ You will be given bull and bear cases for each stock. Your job is to evaluate th
 
 Rules:
 - Only include a stock if you have STRONG conviction it is a buying opportunity
-- Return an empty array if no stocks meet this bar — this is the preferred outcome when evidence is weak
-- Maximum ${MAX_PICKS} stock(s) in the array
-- reasoning must be concise — 2-3 sentences maximum`;
+- Return an empty picks array if no stocks meet this bar — this is the preferred outcome when evidence is weak
+- Maximum ${MAX_PICKS} stock(s) in picks
+- reasoning must be concise — 2-3 sentences maximum
+- When picks is empty you MUST set noPickReason, explaining in 2-3 sentences what specifically fell short. Name the tickers you came closest to picking and what would have had to be different. Do not restate the rules or say only that conviction was insufficient.`;
 
-function _getUserPrompt(stockResearch: StockResearch[], formattedDate: string | undefined) {
+// Exported so scripts/reconstructRun.ts can rebuild this prompt verbatim for a run whose judge
+// call never happened — a copy of the template there would silently drift from this one.
+export function _getUserPrompt(stockResearch: StockResearch[], formattedDate: string | undefined) {
     const stockSummaries = stockResearch.map(({ stockChange, bull, bear }) => `<stock>
 ${stockChange.ticker} dropped ${stockChange.percentageChange.toFixed(2)}% on ${formattedDate}
 
@@ -53,7 +56,7 @@ Key factors: ${bear.keyFactors.join(', ')}
 ${stockSummaries}`;
 }
 
-export async function pickStock(client: Anthropic, stockResearch: StockResearch[], date: Date, record?: RunRecordContext, model: string = MODEL): Promise<StockPick> {
+export async function pickStock(client: Anthropic, stockResearch: StockResearch[], date: Date, record?: RunRecordContext, model: string = MODEL): Promise<JudgeOutput> {
     const formattedDate = date.toISOString().split('T')[0];
 
     const userPrompt = _getUserPrompt(stockResearch, formattedDate);
@@ -64,7 +67,7 @@ export async function pickStock(client: Anthropic, stockResearch: StockResearch[
         system: JUDGE_SYSTEM_PROMPT,
         tools: TOOLS,
         output_config: {
-            format: zodOutputFormat(stockPickSchema)
+            format: zodOutputFormat(judgeOutputSchema)
         },
         messages: [{
             role: 'user',
@@ -96,6 +99,8 @@ export async function pickStock(client: Anthropic, stockResearch: StockResearch[
         throw new Error(`No parsed output from judge for date ${formattedDate}`);
     }
 
+    // Both halves are returned: callers persist `noPickReason` onto the run so a declined day
+    // is queryable in SQL, not just readable by digging into the judge call's raw_response.
     return parsedOutput;
 }
 

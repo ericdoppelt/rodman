@@ -68,9 +68,9 @@ async function main() {
     rejectedResearch.forEach(r => console.log(`${r.ticker} research failed:`, r.details));
 
     console.log('Judging research...');
-    const picks = await pickStock(client, research, yesterday, record);
+    const { picks, noPickReason } = await pickStock(client, research, yesterday, record);
     if (picks.length === 0) {
-      console.log('No stock met the bar for a recommendation today.');
+      console.log('No stock met the bar for a recommendation today —', noPickReason);
     } else {
       picks.forEach(pick => console.log(`PICK: ${pick.ticker} — ${pick.reasoning}`));
     }
@@ -95,7 +95,7 @@ async function main() {
 
     const totalCost = getTotalCost();
     console.log(`Total cost: $${totalCost.toFixed(4)}`);
-    await finalizeRun(supabase, runId, totalCost);
+    await finalizeRun(supabase, runId, totalCost, noPickReason);
 
     logRun({
       date: runDate,

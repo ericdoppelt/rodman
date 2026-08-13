@@ -86,12 +86,32 @@ export interface RejectedCandidate {
 
 export const MAX_PICKS = 1;
 
-export const stockPickSchema = z.array(z.object({
-  ticker: z.string().min(1),
-  reasoning: z.string().min(1),
-})).max(MAX_PICKS);
+// The judge's output is wrapped in an object rather than being a bare array so a run with no
+// pick still has somewhere to say why. Before this, declining stored exactly two characters —
+// `[]` — and the web UI's "no stock met the bar" line was the frontend guessing. The judge's
+// own reasoning is not a fallback: it runs on Opus 5, which returns an empty thinking block
+// (see docs/decisions/0015), so the only way to capture the rationale is to require it here.
+//
+// `.refine` is not enforced by constrained decoding — Anthropic strips refinements into
+// description hints — so an empty `picks` with no `noPickReason` is caught post-hoc by
+// parseWithRetry, which feeds the violation back to the model and asks again.
+export const judgeOutputSchema = z.object({
+  picks: z.array(z.object({
+    ticker: z.string().min(1),
+    reasoning: z.string().min(1),
+  })).max(MAX_PICKS),
+  noPickReason: z.string().min(1).optional().describe(
+    'Required when picks is empty: why no stock cleared the bar today. Omit when picks is non-empty.'
+  ),
+}).refine(
+  output => output.picks.length > 0 || !!output.noPickReason,
+  { message: 'noPickReason is required when picks is empty' }
+);
 
-export type StockPick = z.infer<typeof stockPickSchema>;
+export type JudgeOutput = z.infer<typeof judgeOutputSchema>;
+
+/** The picks alone — unchanged shape, so persistence and the backtest are untouched. */
+export type StockPick = JudgeOutput['picks'];
 
 // --- Backtest-only schemas ---
 

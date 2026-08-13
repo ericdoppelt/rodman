@@ -303,7 +303,7 @@ async function main() {
       const research = await researchStockChangesBacktest(client, dips, marketContextPromise, testDate, newsLookup, BULL_BEAR_MODEL);
       const picks = STRATEGY === 'eliminate'
         ? await pickStocksEliminatingLosers(client, research, testDate, JUDGE_MODEL)
-        : await pickStock(client, research, testDate, undefined, JUDGE_MODEL);
+        : (await pickStock(client, research, testDate, undefined, JUDGE_MODEL)).picks;
       if (finalizeCache) {
         await Promise.all([marketContextPromise, forwardReturnsPromise]); // ensure cache-fill side effects have populated before writing
         finalizeCache();

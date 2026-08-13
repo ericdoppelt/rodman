@@ -165,10 +165,30 @@ export function parseAnalysis(call: LlmCall): ParsedAnalysis | null {
   }
 }
 
-export function parseJudgePicks(call: LlmCall): ParsedJudgePick[] {
+export interface ParsedJudgeOutput {
+  picks: ParsedJudgePick[];
+  noPickReason: string | null;
+}
+
+// Two shapes in the wild. Runs before 2026-08-13 stored a bare array of picks, so a day with
+// no pick stored `[]` and nothing else. Newer runs store `{picks, noPickReason}`, where the
+// reason is required whenever picks is empty. Both are read here so historical runs keep
+// rendering.
+export function parseJudgeOutput(call: LlmCall): ParsedJudgeOutput {
+  let parsed: unknown;
   try {
-    return JSON.parse(extractText(call.raw_response)) as ParsedJudgePick[];
+    parsed = JSON.parse(extractText(call.raw_response));
   } catch {
-    return [];
+    return { picks: [], noPickReason: null };
   }
+
+  if (Array.isArray(parsed)) {
+    return { picks: parsed as ParsedJudgePick[], noPickReason: null };
+  }
+
+  const output = parsed as { picks?: ParsedJudgePick[]; noPickReason?: string };
+  return {
+    picks: Array.isArray(output.picks) ? output.picks : [],
+    noPickReason: output.noPickReason?.trim() || null,
+  };
 }

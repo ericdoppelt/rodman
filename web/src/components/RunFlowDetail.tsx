@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { parseAnalysis, parseJudgePicks, parseMarketContext, parseSearches } from '../lib/parseLlmCall';
+import { parseAnalysis, parseJudgeOutput, parseMarketContext, parseSearches } from '../lib/parseLlmCall';
 import type { LlmCall, RunFlow } from '../types';
 import { PulseLoader } from './PulseLoader';
 
@@ -60,7 +60,7 @@ export function RunFlowDetail({ runId }: Props) {
     supabase
       .from('runs')
       .select(
-        'id, run_date, total_cost_usd, picks(id, run_id, ticker, reasoning, entry_price, created_at), llm_calls(id, run_id, call_type, ticker, model, raw_response, cost_usd, latency_ms, created_at), rejected_candidates(id, run_id, ticker, reason, details, created_at)'
+        'id, run_date, total_cost_usd, no_pick_reason, no_pick_reason_backfilled_at, reconstructed_at, picks(id, run_id, ticker, reasoning, entry_price, created_at), llm_calls(id, run_id, call_type, ticker, model, raw_response, cost_usd, latency_ms, created_at), rejected_candidates(id, run_id, ticker, reason, details, created_at)'
       )
       .eq('id', runId)
       .single()
@@ -96,7 +96,10 @@ export function RunFlowDetail({ runId }: Props) {
     (t): t is string => t != null
   );
   const pickedTickers = new Set(run.picks.map(p => p.ticker));
-  const judgePicks = judgeCall ? parseJudgePicks(judgeCall) : [];
+  const judgeOutput = judgeCall ? parseJudgeOutput(judgeCall) : null;
+  const judgePicks = judgeOutput?.picks ?? [];
+  // Backfilled runs carry the reason on `runs`; live runs carry it in the judge's own response.
+  const noPickReason = run.no_pick_reason ?? judgeOutput?.noPickReason ?? null;
 
   const preResearchRejects = run.rejected_candidates.filter(r => PRE_RESEARCH_REASONS.has(r.reason));
   const researchFailedRejects = run.rejected_candidates.filter(r => r.reason === 'research_failed');
@@ -253,7 +256,19 @@ export function RunFlowDetail({ runId }: Props) {
         <h2>Judge</h2>
         <div className="flow-card">
           {judgePicks.length === 0 ? (
-            <p className="no-pick">No stock met the bar for a recommendation this day.</p>
+            noPickReason ? (
+              <>
+                <p className="no-pick no-pick--explained">{noPickReason}</p>
+                {run.no_pick_reason_backfilled_at && (
+                  <p className="flow-reconstructed">
+                    Reconstructed after the fact — this run predates the judge recording its reason,
+                    so this explains the decision rather than being what was written that day.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="no-pick">No stock met the bar for a recommendation this day.</p>
+            )
           ) : (
             <ul className="flow-judge-list">
               {judgePicks.map(p => (

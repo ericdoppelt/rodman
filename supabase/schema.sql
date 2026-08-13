@@ -8,6 +8,16 @@ create table if not exists runs (
   status text not null default 'running' check (status in ('running', 'completed', 'failed')),
   error text,
   total_cost_usd numeric(10, 6),
+  -- Judge's stated reason for making no pick (judgeOutputSchema.noPickReason). Null when a
+  -- pick was made, or when the run predates the field.
+  no_pick_reason text,
+  -- Non-null means the reason was reconstructed later by replaying the stored judge prompt,
+  -- not recorded during the run. The UI labels these so a reconstruction is never mistaken
+  -- for what the judge actually said that day.
+  no_pick_reason_backfilled_at timestamptz,
+  -- Non-null means the run was completed by replaying stored research after the original run
+  -- failed (see scripts/reconstructRun.ts). `error` stays populated as the original record.
+  reconstructed_at timestamptz,
   created_at timestamptz not null default now(),
   completed_at timestamptz
 );
@@ -33,6 +43,9 @@ create table if not exists picks (
   ticker text not null,
   reasoning text not null,
   entry_price numeric(12, 4),
+  -- Non-null means this pick was reconstructed after the fact from stored research. It was
+  -- never traded, and must be excluded from win rate and return stats.
+  reconstructed_at timestamptz,
   created_at timestamptz not null default now()
 );
 

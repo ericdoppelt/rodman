@@ -17,10 +17,10 @@ export async function createRun(supabase: SupabaseClient, runDate: string, param
   return data.id;
 }
 
-export async function finalizeRun(supabase: SupabaseClient, runId: string, totalCostUsd: number): Promise<void> {
+export async function finalizeRun(supabase: SupabaseClient, runId: string, totalCostUsd: number, noPickReason?: string): Promise<void> {
   const { error } = await supabase
     .from('runs')
-    .update({ status: 'completed', total_cost_usd: totalCostUsd, completed_at: new Date().toISOString() })
+    .update({ status: 'completed', total_cost_usd: totalCostUsd, no_pick_reason: noPickReason ?? null, completed_at: new Date().toISOString() })
     .eq('id', runId);
   if (error) console.error(`Failed to finalize run ${runId}:`, error.message);
 }
