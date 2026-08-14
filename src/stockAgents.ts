@@ -29,13 +29,22 @@ Rules:
 - Write reasoning in plain prose without any XML or HTML tags`;
 
 export const MODEL = 'claude-haiku-4-5-20251001';
-export const MAX_TOKENS = 4096;
+// Three things share this budget, not one: the 2048-token thinking budget below, the
+// `server_tool_use` + `web_search_tool_result` blocks from up to three searches, and only
+// then the analysis JSON. At 4096 that ran out — on 2026-08-13 HUMA's bear and BSP's bull
+// both hit `stop_reason: max_tokens` having emitted no text block at all (BSP's bull spent
+// 4507 output tokens without starting its JSON), so both tickers fell to `research_failed`
+// and the judge decided on 8 candidates instead of 10. 4096 only held while `max_uses` was
+// effectively 1; that run was the first with three searches actually reaching production.
+// 8192 leaves room for the worst case seen and costs almost nothing — you pay per token
+// generated, and the 18 calls that did finish that day averaged 2.1-2.3k output.
+export const MAX_TOKENS = 8192;
 // Haiku 4.5 predates adaptive thinking — `{type: 'adaptive'}` and `output_config.effort`
 // both error on it, so the budgeted form is the only one available. Without a thinking
 // block the schema-constrained JSON is the model's only output channel, so "let me search
 // once more and reconsider" can only be expressed as a second complete answer: 44 of 244
-// bull/bear calls emitted duplicate drafts that way. budget_tokens counts against
-// MAX_TOKENS; 2048 leaves ~1200 tokens of headroom over the longest analysis seen (850).
+// bull/bear calls emitted duplicate drafts that way. 2048 leaves ~1200 tokens of headroom
+// over the longest analysis seen (850).
 const THINKING: Anthropic.Messages.ThinkingConfigParam = {
     type: 'enabled',
     budget_tokens: 2048

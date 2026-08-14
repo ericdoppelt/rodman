@@ -32,7 +32,17 @@ export async function parseWithRetry<ParsedT>(
     // drafts in one response. Only the last one reflects every search it ran. Taking the first
     // fed the judge a pre-final draft on 44 of 244 bull/bear calls before this was caught.
     const textBlock = response.content.findLast((block): block is Anthropic.TextBlock => block.type === 'text');
-    if (!textBlock) throw new Error('No text content block in response to parse');
+    if (!textBlock) {
+      // Distinguish truncation from a genuinely malformed response. Both surface here as "no
+      // text block", but they need opposite fixes, and the 2026-08-13 research_failed pair read
+      // as a parse bug for a day before anyone checked stop_reason. Name the budget instead.
+      if (response.stop_reason === 'max_tokens') {
+        throw new Error(
+          `Response hit max_tokens (${params.max_tokens}) before emitting any text — thinking and tool-result blocks consumed the whole budget (${response.usage.output_tokens} output tokens). Raise max_tokens or lower the thinking budget / search count.`
+        );
+      }
+      throw new Error(`No text content block in response to parse (stop_reason: ${response.stop_reason})`);
+    }
 
     try {
       return { response, parsedOutput: params.output_config.format.parse(textBlock.text) };
