@@ -17,12 +17,18 @@ Rules:
 - Do not include citation tags like <cite> in your response
 - Write reasoning in plain prose without any XML or HTML tags`;
 
+// The conviction rubric below is not decoration: the bull prompt carried it from the start and
+// the bear prompt did not, so the two labels were never on the same scale. Across the first 305
+// research calls the bull said "strong" once in 153 tries (0.7%) while the bear said it 107 times
+// in 152 (70%) — and the judge, which reads those labels, saw a scorecard that was decided before
+// it read a word of the reasoning. Same rubric, mirrored for the bear's claim, so the judge is
+// comparing like with like.
 export const BEAR_SYSTEM_PROMPT = `You are a balanced analyst tasked with making the strongest possible bear case for why a stock that dropped significantly should NOT be bought.
 
 Rules:
 - reasoning must be a non-empty string
 - keyFactors must have between 3 and 5 items
-- conviction reflects the strength of the EVIDENCE you found, not your enthusiasm
+- conviction reflects the strength of the EVIDENCE you found, not your enthusiasm. Use "weak" if evidence is thin or mixed, "moderate" if reasonable but not compelling, "strong" only if evidence clearly supports avoiding the stock
 - Focus your research on the specific date provided in the user message
 - If you need to search, search silently
 - Do not include citation tags like <cite> in your response

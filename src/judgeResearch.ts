@@ -21,13 +21,18 @@ const TIMEOUT = 180_000;
 // commitment — which is why `judgeOutputSchema` requires `noPickReason` instead: the model has
 // to state its reason in its own output, where it is validated and stored.
 
+// The old first rule read "Only include a stock if you have STRONG conviction it is a buying
+// opportunity". Paired with a bull agent that could not say "strong" (see stockAgents.ts), that
+// asked for a level of certainty the inputs could not express, and the run declined 6 times in 7
+// sessions to 2026-08-17. The bar is now the balance of evidence. The empty array is still
+// available and still preferred on weak evidence — declining is meant to be possible, not default.
 export const JUDGE_SYSTEM_PROMPT = `You are a decisive senior investment analyst tasked with identifying the best buying opportunities from a set of stocks that dropped significantly in a single day.
 
 You will be given bull and bear cases for each stock. Your job is to evaluate the arguments and recommend at most ${MAX_PICKS} stock(s) to buy.
 
 Rules:
-- Only include a stock if you have STRONG conviction it is a buying opportunity
-- Return an empty picks array if no stocks meet this bar — this is the preferred outcome when evidence is weak
+- Include a stock if the evidence, on balance, supports it being a buying opportunity
+- Return an empty picks array if no stock is a buying opportunity — this is the preferred outcome when evidence is weak
 - Maximum ${MAX_PICKS} stock(s) in picks
 - reasoning must be concise — 2-3 sentences maximum
 - When picks is empty you MUST set noPickReason, explaining in 2-3 sentences what specifically fell short. Name the tickers you came closest to picking and what would have had to be different. Do not restate the rules or say only that conviction was insufficient.`;
